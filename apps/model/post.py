@@ -1,6 +1,7 @@
 import datetime
 from typing import Optional
 
+from pydantic import field_serializer
 from vorm import Field, Session
 
 from apps.model.base_field import BaseField
@@ -26,6 +27,10 @@ class Post(BaseField):
     like_count: int = Field(default=0, comment="点赞数")
     reply_count: int = Field(default=0, comment="回复数")
     published_at: Optional[datetime.datetime] = Field(default=None, nullable=True, comment="发布时间")
+
+    @field_serializer("published_at")
+    def _serialize_published_at(self, value: Optional[datetime.datetime]) -> Optional[str]:
+        return value.strftime("%Y-%m-%d %H:%M:%S") if value else None
 
     @classmethod
     async def incr_count(cls, session: Session, post_id: int, field: str, amount: int = 1) -> int:

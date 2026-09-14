@@ -53,7 +53,7 @@ async def list_first_level_replies(
 
     data = [
         {
-            **r.model_dump(),
+            **r.model_dump(mode="json"),
             "user": _user_summary(user_map[r.user_id]) if r.user_id in user_map else None,
             "sub_reply_count": sub_count_map.get(r.id, 0),
         }
@@ -104,7 +104,7 @@ async def list_sub_replies(
     data = []
     for r in replies:
         item = {
-            **r.model_dump(),
+            **r.model_dump(mode="json"),
             "user": _user_summary(user_map[r.user_id]) if r.user_id in user_map else None,
             "reply_to_user": (
                 _user_summary(user_map[r.reply_to_user_id]) if r.reply_to_user_id is not None and r.reply_to_user_id in user_map else None

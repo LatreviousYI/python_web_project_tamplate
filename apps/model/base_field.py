@@ -1,5 +1,6 @@
 import datetime
 
+from pydantic import field_serializer
 from vorm import Field, Model
 
 
@@ -16,3 +17,8 @@ class BaseField(Model):
         timestamp_behavior="both",  # INSERT / UPDATE 都会刷新
         index=True,
     )
+
+    @field_serializer("created_at", "updated_at")
+    def _serialize_datetime(self, value: datetime.datetime) -> str:
+        """接口输出统一为 `YYYY-MM-DD HH:MM:SS` 格式。"""
+        return value.strftime("%Y-%m-%d %H:%M:%S")
