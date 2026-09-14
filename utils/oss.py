@@ -4,8 +4,8 @@ from urllib.parse import unquote, urlparse
 
 import oss2
 
-from vrm.tomo.configs import settings
-from vrm.tomo.utils.cipher_util import cipher
+from configs import settings
+from utils.cipher_util import cipher
 
 bucket = None
 

@@ -8,9 +8,22 @@ dependencies = [
     "fastapi[standard]>=0.141.1",
     "nb-log>=14.4",
     "pycryptodome>=3.23.0",
-    "vorm>=0.1.4",
+    "vorm>=0.1.5",
+    "python-dotenv>=1.0.1",
+    "pyjwt>=2.8.0",
+    "oss2>=2.18.0",
+    "aiofiles>=24.1.0",
+    "openpyxl>=3.1.0",
+    "orjson>=3.9.0",
+    "httpx>=0.28.1",
 ]
 
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+typeCheckingMode = "basic"
 
 [tool.ruff]
 # Set the maximum line length to 79.

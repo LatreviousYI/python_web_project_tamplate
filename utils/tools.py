@@ -9,7 +9,6 @@ import functools
 import re
 import string
 import uuid
-import json
 import hashlib
 import secrets
 import datetime
@@ -22,7 +21,7 @@ from fastapi.responses import JSONResponse
 from openpyxl import Workbook
 import orjson
 
-from vrm.tomo.utils import log_util
+from utils import log_util
 
 
 # 随机字符串生成字符集：字母、数字、下划线
@@ -70,7 +69,7 @@ def timestamp_to_string():
     return str(int(datetime.datetime.now().timestamp() * 1000))
 
 
-class JsonExtendEncoder(json.JSONEncoder):
+class JsonExtendEncoder(orjson.JSONEncodeError):
     """扩展的JSON编码器，支持日期时间、日期、小数、字节等类型"""
 
     def default(self, obj):
@@ -93,24 +92,24 @@ class JsonExtendResponse(JSONResponse):
     """使用扩展编码器的JSON响应"""
 
     def render(self, content):
-        return json.dumps(content, cls=JsonExtendEncoder).encode("utf-8")
+        return orjson.dumps(content, cls=JsonExtendEncoder).encode("utf-8")
 
 
 def dict_to_json(data):
     """将字典转换为JSON字符串"""
     if not data:
         data = {}
-    return json.dumps(data, cls=JsonExtendEncoder)
+    return orjson.dumps(data, cls=JsonExtendEncoder)
 
 
 def dict_to_json_ea(data=None):
     """将字典转换为JSON字符串（保留中文字符）"""
-    return json.dumps(data, cls=JsonExtendEncoder, ensure_ascii=False)
+    return orjson.dumps(data, cls=JsonExtendEncoder, ensure_ascii=False)
 
 
 def json_to_dict(json_data):
     """将JSON字符串转换为字典"""
-    return json.loads(json_data)
+    return orjson.loads(json_data)
 
 
 def generate_uuid():
@@ -504,7 +503,7 @@ def is_exceeded(db_time, threshold_minutes=15):
 
 def trans_list_datetime_to_str(data_list: list[dict]):
     data_list_json = dict_to_json_ea(data_list)
-    data_list_dict = json.loads(data_list_json)
+    data_list_dict = orjson.loads(data_list_json)
     return data_list_dict
 
 
@@ -587,4 +586,4 @@ def str_time_tran_file_name(time_str: str):
 
 def stable_dumps(data: dict) -> str:
     """生成稳定的序列化字符串"""
-    return json.dumps(data, sort_keys=True, ensure_ascii=False)
+    return orjson.dumps(data, sort_keys=True, ensure_ascii=False)

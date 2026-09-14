@@ -1,23 +1,27 @@
-import hashlib
-import time
+"""
+JWT 工具模块
+
+提供 token 的生成与校验，以及 FastAPI 鉴权依赖。
+当前为 SSO-ready 占位：假定 SSO 已发放 JWT，token 中携带 user_id。
+"""
+
 from datetime import datetime, timedelta
 from typing import Optional
 
-import bcrypt  # python -m pip install bcrypt
-import jwt  # python -m pip install pyjwt
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+import jwt
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
-from vrm.tomo.configs import settings
-from vrm.tomo.exts import promotes
-from vrm.tomo.utils import response_utils
-from vrm.tomo.utils.log_util import logger
-from vrm.tomo.utils.response_utils import abort
+from configs import settings
+from utils import response_utils
+from utils.log_util import logger
 
 
 class HTTPBearerRaise401(HTTPBearer):
+    """从 Authorization 头解析 Bearer token，缺失/非法时抛 401。"""
+
     async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
         authorization = request.headers.get("Authorization")
         scheme, credentials = get_authorization_scheme_param(authorization)
@@ -37,17 +41,9 @@ class HTTPBearerRaise401(HTTPBearer):
         return HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials)
 
 
-def set_password(password):
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-    return hashed_password.decode("utf-8")
-
-
-def validate_password(plain_password, hashed_password):
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-
-def generate_token(data: dict, expiration_delta=None):
-    token_data = data.copy()  # data = {'id': 3}
+def generate_token(data: dict, expiration_delta: Optional[timedelta] = None):
+    """生成 JWT。data 中通常包含 user_id。"""
+    token_data = data.copy()
     if not expiration_delta:
         expiration_delta = timedelta(minutes=settings.access_token_expire_minutes)
     expiration_time = datetime.now() + expiration_delta
@@ -57,33 +53,22 @@ def generate_token(data: dict, expiration_delta=None):
 
 
 def get_uid_from_jwt(token: str):
+    """从 JWT 解出 user_id。"""
     decoded_payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-    user_id = decoded_payload.get("id")
-    return user_id
-
-
-# def invalid_token():
-#     invalid_request(status.HTTP_401_UNAUTHORIZED, "Invalid token", {"WWW-Authenticate": "Bearer"})
-
-
-# def invalid_permission(detail="没有权限"):
-#     invalid_request(status.HTTP_403_FORBIDDEN, detail)
-
-
-# def invalid_request(code, detail, headers=None):
-#     raise HTTPException(status_code=code, detail=detail, headers=headers)
+    return decoded_payload.get("user_id")
 
 
 def decode_token_get_info(
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearerRaise401()),
-):
+) -> dict:
+    """解析并校验 token，返回其 payload。"""
     token = credentials.credentials
     try:
         decoded_payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except (ExpiredSignatureError, InvalidTokenError) as e:
         logger.exception(f"token verification error. {e}")
         response_utils.invalid_token()
-    except (Exception,) as e:
+    except Exception as e:
         logger.exception(f"token verification error. {e}")
         response_utils.invalid_token()
     if not decoded_payload:
@@ -91,52 +76,6 @@ def decode_token_get_info(
     return decoded_payload
 
 
-# 依赖函数 身份验证
-def verify_token(token_info: dict = Depends(decode_token_get_info)):
-    return token_info.get("id")
-
-
-def verify_fast_token(token_info: dict = Depends(decode_token_get_info)):
-    return token_info.get("fast_token")
-
-
-def get_app_secret(data_list, target_app_key):
-    for item in data_list:
-        if item["app_key"] == target_app_key:
-            return item["app_secret"]
-    return None
-
-
-def generate_signature(params, app_secret):
-    sorted_params = {k: v for k, v in sorted(params.items()) if v is not None}
-    strings = "&".join(f"{k}={v}" for k, v in sorted_params.items())
-    sign_temp = f"{strings}{app_secret}"
-    md5_hash = hashlib.md5(sign_temp.encode("utf-8")).hexdigest().upper()
-    return md5_hash
-
-
-def get_headers_with_signature(signature):
-    headers = {"Content-Type": "application/json", "signature": signature}
-    return headers
-
-
-def validate_request(headers, body, time_limit: int):
-    received_signature = headers.get("signature")
-    if not received_signature:
-        abort(400, "missing signature")
-    appkey = body.get("appkey")
-    timestamp = body.get("timestamp")
-    if not appkey or not timestamp:
-        abort(400, "missing required parameters")
-    current_time = int(time.time() * 1000)  # 毫秒
-    if abs(current_time - int(timestamp)) > time_limit:
-        abort(400, "timestamp is too old or too new")
-    api_keys = promotes.promotes["api_keys"]  # list
-    app_secret = get_app_secret(api_keys, appkey)
-    if not app_secret:
-        abort(403, "invalid appkey")
-    params = {"appkey": appkey, "timestamp": timestamp}
-    server_signature = generate_signature(params, app_secret)
-    if server_signature != received_signature:
-        abort(403, "invalid signature")
-    return True
+def verify_token(token_info: dict = Depends(decode_token_get_info)) -> int:
+    """鉴权依赖：返回当前用户主键 id（int）。"""
+    return token_info.get("user_id")

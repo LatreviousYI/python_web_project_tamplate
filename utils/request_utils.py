@@ -7,7 +7,7 @@
 from fastapi import Request
 from starlette.requests import ClientDisconnect
 
-from vrm.tomo.utils import log_util, response_utils
+from utils import log_util, response_utils
 
 
 class GetPostJsonBody:

@@ -9,7 +9,7 @@ class BaseSettings:
     background_tasks_shutdown_stauts = 0
     # os.path.abspath 将相对路径转换为绝对路径
     # os.path.dirname 当前脚本所在目录
-    basedir = Path(__file__).parent.parent.parent.parent
+    basedir = Path(__file__).parent.parent.parent
 
     jwt_algorithm = "HS256"  # 加密算法
     access_token_expire_minutes = 1440  # token 有效期 1440

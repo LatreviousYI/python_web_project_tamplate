@@ -2,48 +2,30 @@ import time
 from urllib.parse import quote
 from fastapi import status
 
-from vrm.tomo import configs
-from vrm.tomo.exts import httpx_ext
-from vrm.tomo.utils import log_util, response_utils, tools
-
-# 知识库权限
-knowledge_base_management_permission = "Digital_HR_Assistant.back_stage_management.knowledge_base_management"
-# 重置初始化
-reset_tenant_init_permission = "Digital_HR_Assistant.back_stage_management.reset_tenant_init"
-# 管理员权限(可以操作一些只有特殊权限可以操作的业务,如发送通知,初始化租户等)
-back_stage_admin_permission = "Digital_HR_Assistant.back_stage_management.back_stage_admin"
-# dashboard权限
-back_stage_dashboard_permission = "Digital_HR_Assistant.back_stage_management.digit_hr_assistant_backstage_dashboard"
-# voe后台权限
-voe_backstage_management_permission = "Digital_HR_Assistant.back_stage_management.voe_backstage_management"
-# 通用知识库操作权限
-backstage_internal_knowledge_cud = "Digital_HR_Assistant.back_stage_management.digit_hr_assistant_backstage_internal_knowledge_cud"
-# 技能操作权限
-ability_management = "Digital_HR_Assistant.back_stage_management.ability_management"
-# 超级管理员
-digit_hr_assistant_super_admin = "Digital_HR_Assistant.digit_hr_assistant_super_admin"
-# 工单处理
-workorder_manage = "Digital_HR_Assistant.back_stage_management.digit_hr_assistant_backstage_workorder"
+import configs
+from utils import log_util, response_utils, tools, httpx_utils
 
 
 def get_client_or_secret(is_backstage: True, is_client_id: True):
     if is_backstage:
         if is_client_id:
-            return configs.settings.fast_go_hr_back_stage_client
+            return configs.settings.fast_go_client
         else:
-            return configs.settings.fast_go_hr_back_stage_secret_key
+            return configs.settings.fast_go_secret_key
     else:
         if is_client_id:
-            return configs.settings.fast_go_hr_client
+            return configs.settings.fast_go_client
         else:
-            return configs.settings.fast_go_hr_secret_key
+            return configs.settings.fast_go_secret_key
 
 
+# 获取登录页地址 local_url为当前用户访问的地址,登录完后会跳回到这个地址
 def get_login_url(local_url, is_backstage: True):
     login_url = f"{configs.settings.fast_go_website_url}/login?client={get_client_or_secret(is_backstage, True)}&redirect={quote(local_url)}"
     return login_url
 
 
+# 接收ticket后拼接成一个url供后续使用
 def get_sign_by_ticket_url(ticket, is_backstage: True):
     timestamp = str(int(time.time() * 1000))  # 时间戳
     nonce = tools.get_random_string(32)  # 随机字符串
@@ -53,19 +35,54 @@ def get_sign_by_ticket_url(ticket, is_backstage: True):
     return check_ticket_url
 
 
+# 请求拼接好的ticket 获取用户信息
+# 返回结果如下
+# {
+#     "code": 200,
+#     "userAccountInfo": {
+#         "accountArea": "",
+#         "accountCode": "NVYQL",
+#         "accountStatus": "Normal",
+#         "createdBy": "",
+#         "createdId": 0,
+#         "createdTime": 1742288991000,
+#         "disabled": false,
+#         "email": "lv.yitao@fescoadecco.com",
+#         "firstLoginFlag": false,
+#         "id": 7140,
+#         "lastLoginTime": 1742368576944,
+#         "loginType": "EmailCode",
+#         "mobilePhone": "",
+#         "nickName": "lvyitao",
+#         "paasId": "",
+#         "password": "MWNrMTJiMTNrMWptanhyZzFoMDEyOWgybGo=:ApILV+NTsFk=",
+#         "revision": 0,
+#         "spareEmail": "",
+#         "sparePhone": "",
+#         "tenantId": 1,
+#         "tenantName": "FA",
+#         "tenantCode": "",
+#         "thirdId": "",
+#         "updatedBy": "",
+#         "updatedId": 0,
+#         "updatedTime": 1742289688000,
+#         "userName": ""
+#     },
+#     "fastToken":"kjhajhskjhkjhkj"
+# }
 async def do_fastgo_check_ticket(ticket, is_backstage: True):
     url = get_sign_by_ticket_url(ticket, is_backstage)
-    response = await httpx_ext.cus_httpx_client.post(url)
+    response = await httpx_utils.httpx_client.post(url)
     return response.json()
 
 
-async def get_menu_tree_by_token(fast_token, is_backstage: True):
-    get_menu_url = (
-        f"{configs.settings.fast_go_api_url}/api/fast-go/FunctionPoints/getMenuTreeByToken?clientCode={get_client_or_secret(is_backstage, True)}"
-    )
-    headers = {"Fast-Token": fast_token}
-    response = await httpx_ext.cus_httpx_client.post(get_menu_url, headers=headers)
-    return response.json()
+# async def get_menu_tree_by_token(fast_token, is_backstage: True):
+#     get_menu_url = (
+#         f"{configs.settings.fast_go_api_url}/api/fast-go/FunctionPoints/getMenuTreeByToken?clientCode={get_client_or_secret(is_backstage, True)}"
+#     )
+#     headers = {"Fast-Token": fast_token}
+#     response = await httpx_utils.httpx_client.post(get_menu_url, headers=headers)
+#     return response.json()
 
 
 def get_permission_children(data: list, path: str, key_word: str, children_key_word: str):
@@ -101,43 +118,44 @@ def get_permission_children(data: list, path: str, key_word: str, children_key_w
         return {}
 
 
-async def add_tenant(fast_token: str, tenant_code: str, tenant_alias: str):
-    """
-    description: # /api/fast-go/Tenant/addTenant 创建租户
-    param {str} fast_token
-    param {str} tenant_code
-    param {str} tenant_alias
-    return {*}
-    """
+# async def add_tenant(fast_token: str, tenant_code: str, tenant_alias: str):
+#     """
+#     description: # /api/fast-go/Tenant/addTenant 创建租户
+#     param {str} fast_token
+#     param {str} tenant_code
+#     param {str} tenant_alias
+#     return {*}
+#     """
 
-    url = f"{configs.settings.fast_go_api_url}/api/fast-go/Tenant/addTenant"
-    headers = {"Fast-Token": fast_token}
-    body = {
-        "tenantInfo": {
-            "tenantCode": tenant_code,
-            "tenantAlias": tenant_alias,
-            "isEnterprise": False,
-            "isVendor": False,
-            "isArea": False,
-            "isManageAcc": True,
-        },
-        "clientIds": [configs.settings.fast_go_system_id],
-    }
-    response = await httpx_ext.cus_httpx_client.post(url, headers=headers, json=body)
-    if response.status_code != 200:
-        log_util.logger.error(f"请求增加租户报错,header:{headers},body:{body},response:{response.text}")
-        return "请求增加租户报错"
-    response_json = response.json()
-    if response_json["code"] != 0:
-        log_util.logger.error(f"请求增加租户报错,header:{headers},body:{body},response:{response_json}")
-        return "请求增加租户报错"
-    return None
+#     url = f"{configs.settings.fast_go_api_url}/api/fast-go/Tenant/addTenant"
+#     headers = {"Fast-Token": fast_token}
+#     body = {
+#         "tenantInfo": {
+#             "tenantCode": tenant_code,
+#             "tenantAlias": tenant_alias,
+#             "isEnterprise": False,
+#             "isVendor": False,
+#             "isArea": False,
+#             "isManageAcc": True,
+#         },
+#         "clientIds": [configs.settings.fast_go_system_id],
+#     }
+#     response = await httpx_utils.httpx_client.post(url, headers=headers, json=body)
+#     if response.status_code != 200:
+#         log_util.logger.error(f"请求增加租户报错,header:{headers},body:{body},response:{response.text}")
+#         return "请求增加租户报错"
+#     response_json = response.json()
+#     if response_json["code"] != 0:
+#         log_util.logger.error(f"请求增加租户报错,header:{headers},body:{body},response:{response_json}")
+#         return "请求增加租户报错"
+#     return None
 
 
+# 退出登录
 async def login_out(fast_token):
     login_out_url = f"{configs.settings.fast_go_api_url}/api/fast-go/user/doExit"
     headers = {"Fast-Token": fast_token}
-    response = await httpx_ext.cus_httpx_client.post(login_out_url, headers=headers)
+    response = await httpx_utils.httpx_client.post(login_out_url, headers=headers)
     if response.status_code != status.HTTP_200_OK:
         log_util.logger.error("fastgo退出登录失败")
         response_utils.server_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "fastgo退出登录失败")
@@ -167,12 +185,12 @@ def clean_menu_fields(menu_list, fields_to_remove):
 async def get_tenant_list(fast_token: str, clientCode: str):
     url = f"{configs.settings.fast_go_api_url}/api/fast-go/api/user/auth/getTenantList?clientCode={clientCode}"
     headers = {"Fast-Token": fast_token}
-    response = await httpx_ext.cus_httpx_client.get(url, headers=headers)
+    response = await httpx_utils.httpx_client.get(url, headers=headers)
     return response.json()
 
 
 async def switch_tenant(fast_token, tenant_id: int):
     url = f"{configs.settings.fast_go_api_url}/api/fast-go/user/switchTenantDoLogin?tenantId={tenant_id}&clientCode="
     headers = {"Fast-Token": fast_token}
-    response = await httpx_ext.cus_httpx_client.post(url, headers=headers)
+    response = await httpx_utils.httpx_client.post(url, headers=headers)
     return response.json()
