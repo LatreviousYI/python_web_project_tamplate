@@ -44,3 +44,8 @@ async def fastgo_login(session: Session, ticket: str) -> dict:
     token = generate_token({"user_id": user.id, "fast_token": fast_token})
 
     return {"token": token, "user": user}
+
+
+async def fastgo_logout(fast_token: str) -> None:
+    """fastgo 退出登录：调用 SSO 注销 fast_token（本地 JWT 由客户端丢弃）。"""
+    await fast_go.login_out(fast_token)

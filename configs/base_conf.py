@@ -17,3 +17,8 @@ class BaseSettings:
 
     request_password = "xiaozhi_6"  # 请求时不需要登录token验证,但是需要安全验证,可以用这个密码
     request_password_hsah = "ab3f30418a590600ad9b6220ab5cc952fcbbb6424cfee44d7de2618b0110e717"  # AKS3HKH7KJSAJH@AS
+
+    oss_access_key_id = "o22bbXiiaMj09RStxTPUrSkcFXHMFfXzvwqJHHPDeoQ="  # LTAI5tAFmDSomsxiX78BSXtC
+    oss_access_key_secret = "rXyarn206sUswoIwOky0wlJBGCPUg5hCK2Ep2vHpcp4="
+    oss_endpoint = "https://oss-cn-shanghai.aliyuncs.com"
+    oss_bucket_name = "ai-hrbp-prod"

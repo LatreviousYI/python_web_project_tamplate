@@ -6,7 +6,7 @@ import configs
 from utils import log_util, response_utils, tools, httpx_utils
 
 
-def get_client_or_secret(is_backstage: True, is_client_id: True):
+def get_client_or_secret(is_backstage=True, is_client_id=True):
     if is_backstage:
         if is_client_id:
             return configs.settings.fast_go_client
@@ -20,13 +20,13 @@ def get_client_or_secret(is_backstage: True, is_client_id: True):
 
 
 # 获取登录页地址 local_url为当前用户访问的地址,登录完后会跳回到这个地址
-def get_login_url(local_url, is_backstage: True):
+def get_login_url(local_url, is_backstage=True):
     login_url = f"{configs.settings.fast_go_website_url}/login?client={get_client_or_secret(is_backstage, True)}&redirect={quote(local_url)}"
     return login_url
 
 
 # 接收ticket后拼接成一个url供后续使用
-def get_sign_by_ticket_url(ticket, is_backstage: True):
+def get_sign_by_ticket_url(ticket, is_backstage=True):
     timestamp = str(int(time.time() * 1000))  # 时间戳
     nonce = tools.get_random_string(32)  # 随机字符串
     sign_full_str = f"client={get_client_or_secret(is_backstage, True)}&nonce={nonce}&ticket={ticket}&timestamp={timestamp}&key={get_client_or_secret(is_backstage, False)}"
@@ -70,13 +70,13 @@ def get_sign_by_ticket_url(ticket, is_backstage: True):
 #     },
 #     "fastToken":"kjhajhskjhkjhkj"
 # }
-async def do_fastgo_check_ticket(ticket, is_backstage: True):
+async def do_fastgo_check_ticket(ticket, is_backstage=True):
     url = get_sign_by_ticket_url(ticket, is_backstage)
     response = await httpx_utils.httpx_client.post(url)
     return response.json()
 
 
-# async def get_menu_tree_by_token(fast_token, is_backstage: True):
+# async def get_menu_tree_by_token(fast_token, is_backstage=True):
 #     get_menu_url = (
 #         f"{configs.settings.fast_go_api_url}/api/fast-go/FunctionPoints/getMenuTreeByToken?clientCode={get_client_or_secret(is_backstage, True)}"
 #     )

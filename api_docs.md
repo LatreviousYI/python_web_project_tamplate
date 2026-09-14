@@ -12,6 +12,7 @@
 - [4. 首页模块 /home](#4-首页模块-home)
 - [5. 内容模块 /posts](#5-内容模块-posts)
 - [6. 回复模块 /replies](#6-回复模块-replies)
+- [7. 通用模块 /common](#7-通用模块-common)
 
 ---
 
@@ -240,6 +241,27 @@ SSO 用户。
 
 ---
 
+### POST /auth/logout
+
+退出登录：调用 fastgo SSO 注销 `fast_token`（客户端同时丢弃本地 JWT）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求体**
+
+无。
+
+**响应示例**
+
+```json
+{ "code": 200, "message": "success", "data": null }
+```
+
+> 说明：本地 JWT 为无状态 token，服务端不保存会话；退出时服务端调用 SSO 注销 `fast_token`（使 SSO 会话失效），本地 token 由前端直接丢弃。
+
+---
+
 ## 4. 首页模块 /home
 
 ### GET /home/message
@@ -305,6 +327,26 @@ SSO 用户。
 }
 ```
 
+### GET /posts/mine
+
+个人中心：当前用户自己的全部内容（含 `draft` / `pending` / `published`），按创建时间倒序。附带 `liked` 字段。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求参数（query）**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `page` | int | 1 | 页码，`>= 1` |
+| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `type` | string | — | 可选，按类型筛选：`article` / `qa` |
+| `status` | string | — | 可选，按状态筛选：`draft` / `pending` / `published` |
+
+**响应示例**
+
+`data` 为 `PageResult`，记录结构与 [GET /posts](#get-posts) 相同（含 `liked`）。
+
 ### POST /posts
 
 创建内容（文章 / 问答）。
@@ -330,7 +372,7 @@ SSO 用户。
 | `title` | string | 是 | 标题，去除首尾空白后非空 |
 | `content` | string | 是 | 正文，去除首尾空白后非空 |
 | `type` | string | 是 | 类型：`article` / `qa` |
-| `status` | string | 是 | 初始状态：`draft` / `pending` |
+| `status` | string | 否 | 初始状态：`draft` / `pending`，默认 `draft` |
 | `summary` | string \| null | 否 | 摘要 |
 | `tags` | array | 否 | 标签列表，默认 `[]` |
 
@@ -340,7 +382,7 @@ SSO 用户。
 
 ### GET /posts/{post_id}
 
-内容详情（访问时 `view_count` 原子 +1）。附带 `liked`：当前用户是否已点赞（未登录时为 `false`）。未发布内容（`draft` / `pending`）仅作者本人可查看，非作者访问返回 `code=404`。
+内容详情（访问时 `view_count` 原子 +1）。附带 `liked`：当前用户是否已点赞（未登录时为 `false`）；附带作者信息 `user`（最小用户信息）。未发布内容（`draft` / `pending`）仅作者本人可查看，非作者访问返回 `code=404`。
 
 | 鉴权 | 无（可选 Bearer token，用于返回 `liked`） |
 | --- | --- |
@@ -353,7 +395,32 @@ SSO 用户。
 
 **响应示例**
 
-`data` 为 [Post](#22-post-osc_post) 对象 + `liked` 字段；不存在或非作者访问未发布内容时 `code=404`。
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 10,
+    "user_id": 1,
+    "type": "article",
+    "title": "标题",
+    "summary": "摘要",
+    "content": "# 正文 markdown",
+    "status": "published",
+    "tags": ["Python", "FastAPI"],
+    "view_count": 101,
+    "like_count": 5,
+    "reply_count": 3,
+    "published_at": "2026-09-14 10:00:00",
+    "created_at": "2026-09-13 10:00:00",
+    "updated_at": "2026-09-14 10:00:00",
+    "liked": false,
+    "user": { "id": 1, "user_name": "张三", "avatar": null }
+  }
+}
+```
+
+> `data` = [Post](#22-post-osc_post) 对象 + `liked`（当前用户是否已点赞）+ `user`（作者最小信息 `{id, user_name, avatar}`）。不存在或非作者访问未发布内容时 `code=404`。
 
 ### PUT /posts/{post_id}
 
@@ -430,6 +497,23 @@ SSO 用户。
 **响应示例**
 
 `data` 为更新后的 [Post](#22-post-osc_post) 对象。已 `published` 的内容不可由用户修改状态（HTTP `400`）。
+
+### POST /posts/{post_id}/publish
+
+个人中心发布草稿：`draft` → `pending`（提交审核）。`published` 仍由系统审核通过后置入，用户不可直接发布。
+
+| 鉴权 | 是（Bearer token，作者本人） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `post_id` | int | 内容 id |
+
+**响应示例**
+
+`data` 为更新后的 [Post](#22-post-osc_post) 对象。内容不存在或无权限时 `code=404`；已 `published` 的内容不可重复发布（HTTP `400`）。
 
 ### POST /posts/{post_id}/like
 
@@ -649,3 +733,53 @@ SSO 用户。
 **响应示例**
 
 `data` 为更新后的 [Reply](#23-reply-osc_reply) 对象（含最新计数）。
+
+---
+
+## 7. 通用模块 /common
+
+### POST /common/upload/file
+
+上传文件到 OSS，返回文件访问 URL。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求体**（`multipart/form-data`）
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `file` | file | 是 | 上传的文件 |
+
+**行为说明**
+
+- 服务端读取文件字节，重命名为 `{短uuid}{原后缀}`（例如 `e1f2a3b4.png`）。
+- 存储到 OSS 的 `open_source_community/` 目录下，得到 `file_key`。
+- 返回的 `data` 为文件访问 URL：`{mine_server}/api/v1/common/get/file?file_key={file_key}`。
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "https://example.com/api/v1/common/get/file?file_key=open_source_community/e1f2a3b4.png"
+}
+```
+
+### GET /common/get/file
+
+根据 `file_key` 生成带签名的 OSS 临时访问地址（2 小时有效），并 `302` 跳转。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求参数（query）**
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `file_key` | string | 是 | 文件在 OSS 中的 key（含目录前缀，如 `open_source_community/e1f2a3b4.png`） |
+
+**响应**
+
+`302` 跳转到 OSS 签名 URL（有效期 2 小时）。

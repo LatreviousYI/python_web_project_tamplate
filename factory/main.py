@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.router import auth, home, post, reply
+from apps.router import auth, common, home, post, reply
 from factory.middleware import register_error_handlers
 from factory.sync_db import sync_db
 from utils import httpx_utils
@@ -16,6 +16,7 @@ def register_routers(app: FastAPI):
     api_router.include_router(auth.router)
     api_router.include_router(post.router)
     api_router.include_router(reply.router)
+    api_router.include_router(common.router)
     app.include_router(api_router)
 
 

@@ -10,7 +10,7 @@
 
 from fastapi import Depends
 
-from utils.jwt import verify_token, verify_token_optional
+from utils.jwt import decode_token_get_info, verify_token, verify_token_optional
 
 
 async def get_current_user(user_id: int = Depends(verify_token)) -> int:
@@ -21,3 +21,8 @@ async def get_current_user(user_id: int = Depends(verify_token)) -> int:
 async def get_optional_user(user_id: int | None = Depends(verify_token_optional)) -> int | None:
     """可选鉴权：已登录返回用户主键 id，未登录 / 非法 token 返回 None。"""
     return user_id
+
+
+async def get_current_token_info(token_info: dict = Depends(decode_token_get_info)) -> dict:
+    """当前登录用户的 JWT payload（含 user_id、fast_token 等），供需要完整 token 信息的接口使用。"""
+    return token_info

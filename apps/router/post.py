@@ -35,6 +35,7 @@ class PostCreate(PostStatusUpdate):
     type: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     summary: str | None = None
     tags: list[str] = []
+    status: Literal["draft", "pending"] = "draft"
 
 
 @router.get("")
@@ -46,6 +47,20 @@ async def list_posts(
     user_id: int | None = Depends(dependencies.get_optional_user),
 ) -> ApiResponse:
     result = await post_service.list_posts(session, page, page_size, type, user_id)
+    return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
+
+
+@router.get("/mine")
+async def list_my_posts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    type: str | None = Query(None),
+    status: Literal["draft", "pending", "published"] | None = Query(None),
+    session=Depends(get_session),
+    user_id: int = Depends(dependencies.get_current_user),
+) -> ApiResponse:
+    """个人中心：我的内容列表（含草稿 / 待审核 / 已发布），可按类型 / 状态筛选。"""
+    result = await post_service.list_my_posts(session, user_id, page, page_size, type, status)
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
 
 
@@ -113,6 +128,19 @@ async def set_post_status(
     user_id: int = Depends(dependencies.get_current_user),
 ) -> ApiResponse:
     post = await post_service.set_post_status(session, post_id, user_id, payload.status)
+    if post is None:
+        return ApiResponse(code=404, message="post not found")
+    return ApiResponse(data=post)
+
+
+@router.post("/{post_id}/publish")
+async def submit_post(
+    post_id: int,
+    session=Depends(get_session),
+    user_id: int = Depends(dependencies.get_current_user),
+) -> ApiResponse:
+    """个人中心发布草稿：draft → pending（提交审核；published 由系统审核后置入）。"""
+    post = await post_service.set_post_status(session, post_id, user_id, "pending")
     if post is None:
         return ApiResponse(code=404, message="post not found")
     return ApiResponse(data=post)

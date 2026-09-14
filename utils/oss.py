@@ -53,7 +53,7 @@ def upload_image_with_bytes(bucket: oss2.Bucket, image_bytes, image_name):
     return file_url
 
 
-def set_file_time(bucket: oss2.Bucket, oss_name, expiration: int = None):
+def set_file_time(bucket: oss2.Bucket, oss_name, expiration: int = 60 * 60 * 24 * 3650):
     if not expiration:
         expiration = 60 * 60 * 24 * 3650
     # oss_name is 'p9e/birth.jpg'
@@ -85,7 +85,7 @@ async def upload_file_with_bytes_async_get_file_key(bucket, file_name, file_byte
         return await loop.run_in_executor(pool, upload_file_with_bytes_get_name_key, bucket, file_name, file_bytes)
 
 
-async def set_file_time_async(bucket, oss_name, expiration=None):
+async def set_file_time_async(bucket, oss_name, expiration=60 * 60 * 24 * 3650):
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor() as pool:
         return await loop.run_in_executor(pool, set_file_time, bucket, oss_name, expiration)

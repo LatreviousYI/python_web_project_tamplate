@@ -10,6 +10,7 @@ from typing import Optional
 
 from vorm import Session, col
 
+from apps.model.auth import User
 from apps.model.post import Post, PostLike
 from utils.response_utils import abort
 
@@ -25,6 +26,11 @@ async def _liked_post_ids(session: Session, user_id: Optional[int], post_ids: li
     return {l.post_id for l in likes}
 
 
+def _user_summary(user: User) -> dict:
+    """内容作者的最小用户信息（不泄露手机号 / 邮箱 / 租户）。"""
+    return {"id": user.id, "user_name": user.user_name, "avatar": user.avatar}
+
+
 async def list_posts(
     session: Session,
     page: int = 1,
@@ -35,6 +41,27 @@ async def list_posts(
     query = session.query(Post).filter(Post.status == "published")  # 仅已发布对外展示（草稿/待审核走个人中心）
     if post_type:
         query = query.filter(Post.type == post_type)
+    totals = await query.count()
+    posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
+    liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
+    data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids} for p in posts]
+    return {"totals": totals, "data": data}
+
+
+async def list_my_posts(
+    session: Session,
+    user_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    post_type: Optional[str] = None,
+    status: Optional[str] = None,
+) -> dict:
+    """个人中心：当前用户自己的全部内容（含草稿 / 待审核 / 已发布），可按类型 / 状态筛选。"""
+    query = session.query(Post).filter(Post.user_id == user_id)
+    if post_type:
+        query = query.filter(Post.type == post_type)
+    if status:
+        query = query.filter(Post.status == status)
     totals = await query.count()
     posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
@@ -76,7 +103,12 @@ async def get_post(session: Session, post_id: int, user_id: Optional[int] = None
     if post is None:
         return None
     liked = post_id in await _liked_post_ids(session, user_id, [post_id])
-    return {**post.model_dump(mode="json"), "liked": liked}
+    author = await session.query(User).filter(User.id == post.user_id).first()
+    return {
+        **post.model_dump(mode="json"),
+        "liked": liked,
+        "user": _user_summary(author) if author else None,
+    }
 
 
 async def update_post(session: Session, post_id: int, user_id: int, **fields) -> Post | None:
