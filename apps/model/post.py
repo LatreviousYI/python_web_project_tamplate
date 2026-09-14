@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import field_serializer
 from vorm import Field, Session
+from vorm.ddl import Index
 
 from apps.model.base_field import BaseField
 
@@ -44,3 +45,21 @@ class Post(BaseField):
             f"UPDATE {cls.table_name()} SET {field} = {field} + %s WHERE id = %s",
             [amount, post_id],
         )
+
+
+class PostLike(BaseField):
+    """文章 / 问答点赞记录：记录「哪个用户赞了哪篇内容」，用于判断是否已赞、支持取消。
+
+    与 Post 上的 like_count（冗余计数）配套：
+    - 计数用于列表展示，like 记录用于判断「我是否已经点过赞」
+    - 同一用户对同一内容最多一条记录（post_id + user_id 唯一）
+    """
+
+    class Meta:
+        table = "osc_post_like"
+        indexes = [
+            Index(fields=("post_id", "user_id"), unique=True),
+        ]
+
+    post_id: int = Field(index=True, comment="内容id（osc_post.id）")
+    user_id: int = Field(index=True, comment="点赞用户主键id（osc_user.id）")

@@ -24,13 +24,36 @@ def _user_summary(user: User) -> dict:
     return {"id": user.id, "user_name": user.user_name, "avatar": user.avatar}
 
 
+async def _vote_state(session: Session, user_id: Optional[int], reply_ids: list[int]) -> tuple[set[int], set[int]]:
+    """批量查询当前用户对这些回复的点赞 / 点踩状态（单条 IN 查询，避免 N+1）。"""
+    liked: set[int] = set()
+    disliked: set[int] = set()
+    if user_id is None or not reply_ids:
+        return liked, disliked
+    votes = (
+        await session.query(ReplyVote)
+        .filter(
+            col(ReplyVote.user_id) == user_id,
+            col(ReplyVote.reply_id).in_(reply_ids),
+        )
+        .all()
+    )
+    for v in votes:
+        if v.vote_type == "like":
+            liked.add(v.reply_id)
+        elif v.vote_type == "dislike":
+            disliked.add(v.reply_id)
+    return liked, disliked
+
+
 async def list_first_level_replies(
     session: Session,
     post_id: int,
     page: int = 1,
     page_size: int = 20,
+    user_id: Optional[int] = None,
 ) -> dict | None:
-    """一级回复列表：直接回复内容本身（reply_to 为 null），附每条的二级回复数。"""
+    """一级回复列表：直接回复内容本身（reply_to 为 null），附每条的二级回复数与点赞状态。"""
     post = await session.query(Post).filter(Post.id == post_id).first()
     if post is None:
         return None
@@ -45,17 +68,21 @@ async def list_first_level_replies(
     if not replies:
         return {"totals": totals, "data": []}
 
+    reply_ids = [r.id for r in replies]
     user_ids = {r.user_id for r in replies}
     users = await session.query(User).filter(col(User.id).in_(user_ids)).all()
     user_map = {u.id: u for u in users}
 
-    sub_count_map = await _count_sub_replies(session, [r.id for r in replies])
+    sub_count_map = await _count_sub_replies(session, reply_ids)
+    liked_ids, disliked_ids = await _vote_state(session, user_id, reply_ids)
 
     data = [
         {
             **r.model_dump(mode="json"),
             "user": _user_summary(user_map[r.user_id]) if r.user_id in user_map else None,
             "sub_reply_count": sub_count_map.get(r.id, 0),
+            "liked": r.id in liked_ids,
+            "disliked": r.id in disliked_ids,
         }
         for r in replies
     ]
@@ -79,8 +106,9 @@ async def list_sub_replies(
     reply_id: int,
     page: int = 1,
     page_size: int = 20,
+    user_id: Optional[int] = None,
 ) -> dict | None:
-    """某条一级回复下的二级回复（分页，平级展示，附回复者与被回复者信息）。"""
+    """某条一级回复下的二级回复（分页，平级展示，附回复者 / 被回复者信息与点赞状态）。"""
     parent = await session.query(Reply).filter(Reply.id == reply_id).first()
     if parent is None:
         return None
@@ -93,6 +121,7 @@ async def list_sub_replies(
     if not replies:
         return {"totals": totals, "data": []}
 
+    reply_ids = [r.id for r in replies]
     user_ids: set[int] = set()
     for r in replies:
         user_ids.add(r.user_id)
@@ -100,6 +129,8 @@ async def list_sub_replies(
             user_ids.add(r.reply_to_user_id)
     users = await session.query(User).filter(col(User.id).in_(user_ids)).all()
     user_map = {u.id: u for u in users}
+
+    liked_ids, disliked_ids = await _vote_state(session, user_id, reply_ids)
 
     data = []
     for r in replies:
@@ -109,6 +140,8 @@ async def list_sub_replies(
             "reply_to_user": (
                 _user_summary(user_map[r.reply_to_user_id]) if r.reply_to_user_id is not None and r.reply_to_user_id in user_map else None
             ),
+            "liked": r.id in liked_ids,
+            "disliked": r.id in disliked_ids,
         }
         data.append(item)
     return {"totals": totals, "data": data}

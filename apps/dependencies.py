@@ -10,9 +10,14 @@
 
 from fastapi import Depends
 
-from utils.jwt import verify_token
+from utils.jwt import verify_token, verify_token_optional
 
 
 async def get_current_user(user_id: int = Depends(verify_token)) -> int:
     """当前登录用户，返回用户主键 id（osc_user.id，int）。"""
+    return user_id
+
+
+async def get_optional_user(user_id: int | None = Depends(verify_token_optional)) -> int | None:
+    """可选鉴权：已登录返回用户主键 id，未登录 / 非法 token 返回 None。"""
     return user_id

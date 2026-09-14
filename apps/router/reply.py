@@ -37,8 +37,9 @@ async def list_first_level_replies(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session=Depends(get_session),
+    user_id: int | None = Depends(dependencies.get_optional_user),
 ) -> ApiResponse:
-    result = await reply_service.list_first_level_replies(session, post_id, page, page_size)
+    result = await reply_service.list_first_level_replies(session, post_id, page, page_size, user_id)
     if result is None:
         return ApiResponse(code=404, message="post not found")
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
@@ -50,8 +51,9 @@ async def list_sub_replies(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session=Depends(get_session),
+    user_id: int | None = Depends(dependencies.get_optional_user),
 ) -> ApiResponse:
-    result = await reply_service.list_sub_replies(session, reply_id, page, page_size)
+    result = await reply_service.list_sub_replies(session, reply_id, page, page_size, user_id)
     if result is None:
         return ApiResponse(code=404, message="reply not found")
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))

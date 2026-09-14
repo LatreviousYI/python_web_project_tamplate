@@ -43,8 +43,9 @@ async def list_posts(
     page_size: int = Query(20, ge=1, le=100),
     type: str | None = Query(None),
     session=Depends(get_session),
+    user_id: int | None = Depends(dependencies.get_optional_user),
 ) -> ApiResponse:
-    result = await post_service.list_posts(session, page, page_size, type)
+    result = await post_service.list_posts(session, page, page_size, type, user_id)
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
 
 
@@ -68,8 +69,12 @@ async def create_post(
 
 
 @router.get("/{post_id}")
-async def get_post(post_id: int, session=Depends(get_session)) -> ApiResponse:
-    post = await post_service.get_post(session, post_id)
+async def get_post(
+    post_id: int,
+    session=Depends(get_session),
+    user_id: int | None = Depends(dependencies.get_optional_user),
+) -> ApiResponse:
+    post = await post_service.get_post(session, post_id, user_id)
     if post is None:
         return ApiResponse(code=404, message="post not found")
     return ApiResponse(data=post)
@@ -108,6 +113,18 @@ async def set_post_status(
     user_id: int = Depends(dependencies.get_current_user),
 ) -> ApiResponse:
     post = await post_service.set_post_status(session, post_id, user_id, payload.status)
+    if post is None:
+        return ApiResponse(code=404, message="post not found")
+    return ApiResponse(data=post)
+
+
+@router.post("/{post_id}/like")
+async def like_post(
+    post_id: int,
+    session=Depends(get_session),
+    user_id: int = Depends(dependencies.get_current_user),
+) -> ApiResponse:
+    post = await post_service.like_post(session, post_id, user_id)
     if post is None:
         return ApiResponse(code=404, message="post not found")
     return ApiResponse(data=post)

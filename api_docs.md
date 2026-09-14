@@ -91,6 +91,8 @@ Authorization: Bearer <token>
 - `pending` → `published`：系统审核通过（系统控制，用户不可直接修改）
 - 已 `published` 的内容，用户不能再修改状态。
 
+**可见性**：公开列表 / 详情仅返回 `published`；`draft` / `pending` 仅作者本人可见（后续由个人中心单独提供）。
+
 ---
 
 ## 2. 数据模型
@@ -154,6 +156,20 @@ SSO 用户。
 | `updated_at` | datetime | 更新时间 |
 
 > 回复采用扁平两级模型：`reply_to` 始终指向根一级回复；`reply_to_user_id` 记录具体被回复的用户。点赞 / 点踩除计数外，另有 `ReplyVote`（`osc_reply_vote`）记录表用于判断「当前用户是否已点赞 / 踩」。
+
+### 2.4 PostLike（`osc_post_like`）
+
+内容点赞记录，用于判断「当前用户是否已点赞」。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 主键，自增 |
+| `post_id` | int | 内容 id（`osc_post.id`） |
+| `user_id` | int | 点赞用户主键 id（`osc_user.id`） |
+| `created_at` | datetime | 创建时间 |
+| `updated_at` | datetime | 更新时间 |
+
+> 与 `Post.like_count`（冗余计数）配套：计数用于列表展示，`PostLike` 记录用于判断「我是否已经点过赞」。同一用户对同一内容最多一条记录（`post_id + user_id` 唯一）。
 
 ---
 
@@ -245,9 +261,9 @@ SSO 用户。
 
 ### GET /posts
 
-内容列表（文章 / 问答），按创建时间倒序。
+内容列表（文章 / 问答），按创建时间倒序。仅返回已发布内容（`published`，草稿 / 待审核不对外展示）。每条记录附带 `liked`：当前用户是否已点赞（未登录时为 `false`）。
 
-| 鉴权 | 无 |
+| 鉴权 | 无（可选 Bearer token，用于返回 `liked`） |
 | --- | --- |
 
 **请求参数（query）**
@@ -281,7 +297,8 @@ SSO 用户。
         "reply_count": 3,
         "published_at": "2026-09-14 10:00:00",
         "created_at": "2026-09-13 10:00:00",
-        "updated_at": "2026-09-14 10:00:00"
+        "updated_at": "2026-09-14 10:00:00",
+        "liked": false
       }
     ]
   }
@@ -323,9 +340,9 @@ SSO 用户。
 
 ### GET /posts/{post_id}
 
-内容详情（访问时 `view_count` 原子 +1）。
+内容详情（访问时 `view_count` 原子 +1）。附带 `liked`：当前用户是否已点赞（未登录时为 `false`）。未发布内容（`draft` / `pending`）仅作者本人可查看，非作者访问返回 `code=404`。
 
-| 鉴权 | 无 |
+| 鉴权 | 无（可选 Bearer token，用于返回 `liked`） |
 | --- | --- |
 
 **路径参数**
@@ -336,7 +353,7 @@ SSO 用户。
 
 **响应示例**
 
-`data` 为 [Post](#22-post-osc_post) 对象；不存在时 `code=404`。
+`data` 为 [Post](#22-post-osc_post) 对象 + `liked` 字段；不存在或非作者访问未发布内容时 `code=404`。
 
 ### PUT /posts/{post_id}
 
@@ -414,15 +431,39 @@ SSO 用户。
 
 `data` 为更新后的 [Post](#22-post-osc_post) 对象。已 `published` 的内容不可由用户修改状态（HTTP `400`）。
 
+### POST /posts/{post_id}/like
+
+点赞 / 取消赞（切换式）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `post_id` | int | 内容 id |
+
+**行为说明（切换式）**
+
+| 当前状态 | 本次操作 | 结果 |
+| --- | --- | --- |
+| 未赞 | 点赞 | 记录 + `like_count +1` |
+| 已赞 | 再点赞 | 取消，`like_count -1` |
+
+**响应示例**
+
+`data` 为更新后的 [Post](#22-post-osc_post) 对象（含最新 `like_count`）。
+
 ---
 
 ## 6. 回复模块 /replies
 
 ### GET /posts/{post_id}/replies
 
-一级回复列表（分页），每条附带其二级回复数。
+一级回复列表（分页），每条附带其二级回复数与点赞状态（`liked` / `disliked`）。
 
-| 鉴权 | 无 |
+| 鉴权 | 无（可选 Bearer token，用于返回 `liked` / `disliked`） |
 | --- | --- |
 
 **路径参数**
@@ -461,20 +502,22 @@ SSO 用户。
         "created_at": "2026-09-14 10:00:00",
         "updated_at": "2026-09-14 10:00:00",
         "user": { "id": 1, "user_name": "张三", "avatar": null },
-        "sub_reply_count": 2
+        "sub_reply_count": 2,
+        "liked": true,
+        "disliked": false
       }
     ]
   }
 }
 ```
 
-> 每条记录 = 回复字段 + `user`（用户摘要）+ `sub_reply_count`（二级回复数）。
+> 每条记录 = 回复字段 + `user`（用户摘要）+ `sub_reply_count`（二级回复数）+ `liked` / `disliked`（当前用户是否已点赞 / 踩，未登录均为 `false`）。
 
 ### GET /replies/{reply_id}/replies
 
-某条一级回复下的二级回复列表（分页，平级展示），附回复者与被回复者信息。
+某条一级回复下的二级回复列表（分页，平级展示），附回复者 / 被回复者信息与点赞状态（`liked` / `disliked`）。
 
-| 鉴权 | 无 |
+| 鉴权 | 无（可选 Bearer token，用于返回 `liked` / `disliked`） |
 | --- | --- |
 
 **路径参数**
@@ -513,14 +556,16 @@ SSO 用户。
         "created_at": "2026-09-14 11:00:00",
         "updated_at": "2026-09-14 11:00:00",
         "user": { "id": 2, "user_name": "李四", "avatar": null },
-        "reply_to_user": { "id": 1, "user_name": "张三", "avatar": null }
+        "reply_to_user": { "id": 1, "user_name": "张三", "avatar": null },
+        "liked": false,
+        "disliked": true
       }
     ]
   }
 }
 ```
 
-> 每条记录 = 回复字段 + `user`（回复者摘要）+ `reply_to_user`（被回复者摘要）。
+> 每条记录 = 回复字段 + `user`（回复者摘要）+ `reply_to_user`（被回复者摘要）+ `liked` / `disliked`（当前用户是否已点赞 / 踩，未登录均为 `false`）。
 
 ### POST /posts/{post_id}/replies
 

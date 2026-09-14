@@ -1,10 +1,10 @@
 from apps.model.auth import User
-from apps.model.post import Post
+from apps.model.post import Post, PostLike
 from apps.model.reply import Reply, ReplyVote
 from common.db import get_engine
 
 
-db_list = (User, Post, Reply, ReplyVote)
+db_list = (User, Post, Reply, ReplyVote, PostLike)
 
 
 async def sync_db():

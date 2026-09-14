@@ -79,3 +79,23 @@ def decode_token_get_info(
 def verify_token(token_info: dict = Depends(decode_token_get_info)) -> int:
     """鉴权依赖：返回当前用户主键 id（int）。"""
     return token_info.get("user_id")
+
+
+def decode_token_get_info_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearerRaise401(auto_error=False)),
+) -> Optional[dict]:
+    """解析并校验 token（可选鉴权）：未携带 / 非法 token 时返回 None，不抛异常。"""
+    if credentials is None:
+        return None
+    token = credentials.credentials
+    try:
+        return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    except (ExpiredSignatureError, InvalidTokenError):
+        return None
+
+
+def verify_token_optional(token_info: Optional[dict] = Depends(decode_token_get_info_optional)) -> Optional[int]:
+    """可选鉴权依赖：已登录返回用户主键 id（int），未登录 / 非法 token 返回 None。"""
+    if token_info is None:
+        return None
+    return token_info.get("user_id")
