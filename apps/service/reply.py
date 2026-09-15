@@ -21,7 +21,7 @@ from utils.response_utils import abort
 
 def _user_summary(user: User) -> dict:
     """回复列表里暴露的最小用户信息（不泄露手机号 / 邮箱 / 租户）。"""
-    return {"id": user.id, "user_name": user.user_name, "avatar": user.avatar}
+    return {"id": user.id, "user_name": user.user_name, "name": user.name, "avatar": user.avatar}
 
 
 async def _vote_state(session: Session, user_id: Optional[int], reply_ids: list[int]) -> tuple[set[int], set[int]]:

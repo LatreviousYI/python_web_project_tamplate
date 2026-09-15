@@ -28,7 +28,15 @@ async def _liked_post_ids(session: Session, user_id: Optional[int], post_ids: li
 
 def _user_summary(user: User) -> dict:
     """内容作者的最小用户信息（不泄露手机号 / 邮箱 / 租户）。"""
-    return {"id": user.id, "user_name": user.user_name, "avatar": user.avatar}
+    return {"id": user.id, "user_name": user.user_name, "name": user.name, "avatar": user.avatar}
+
+
+async def _user_summary_map(session: Session, user_ids: set[int]) -> dict[int, dict]:
+    """批量查询作者最小信息（避免列表 N+1）。"""
+    if not user_ids:
+        return {}
+    users = await session.query(User).filter(col(User.id).in_(user_ids)).all()
+    return {u.id: _user_summary(u) for u in users}
 
 
 async def list_posts(
@@ -47,7 +55,8 @@ async def list_posts(
     totals = await query.count()
     posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
-    data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids} for p in posts]
+    user_map = await _user_summary_map(session, {p.user_id for p in posts})
+    data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids, "user": user_map.get(p.user_id)} for p in posts]
     return {"totals": totals, "data": data}
 
 
@@ -68,7 +77,8 @@ async def list_my_posts(
     totals = await query.count()
     posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
-    data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids} for p in posts]
+    user_map = await _user_summary_map(session, {p.user_id for p in posts})
+    data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids, "user": user_map.get(p.user_id)} for p in posts]
     return {"totals": totals, "data": data}
 
 

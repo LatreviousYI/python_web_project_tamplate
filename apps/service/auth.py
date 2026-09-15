@@ -30,14 +30,20 @@ async def fastgo_login(session: Session, ticket: str) -> dict:
 
     # 按 accountCode 关联本地用户，不存在则创建
     user = await session.query(User).filter(User.user_id == account_code).first()
+    account_name = account_info.get("realName") or account_info.get("nickName")
     if user is None:
         user = User(
             user_id=account_code,
-            user_name=account_info.get("nickName") or account_info.get("userName") or "",
+            user_name=account_info.get("userName") or "",
+            name=account_name or None,
             mobile=account_info.get("mobilePhone") or "",
             email=account_info.get("email"),
             tenant=account_info.get("tenantName"),
         )
+        await session.save(user)
+    elif account_name:
+        # 老用户登录时回填姓名（以 SSO 为准）
+        user.name = account_name
         await session.save(user)
 
     # 本地 JWT：用户主键 id + fast_token

@@ -107,6 +107,7 @@ SSO 用户。
 | --- | --- | --- |
 | `id` | int | 主键，自增 |
 | `user_name` | string | 用户名 |
+| `name` | string \| null | 姓名（真实姓名/展示名） |
 | `mobile` | string | 手机号 |
 | `email` | string \| null | 邮箱 |
 | `tenant` | string \| null | 租户 |
@@ -115,7 +116,7 @@ SSO 用户。
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
 
-> 回复列表接口中对用户做了隐私裁剪，仅暴露 `user` 摘要：`{"id", "user_name", "avatar"}`，不含手机号 / 邮箱 / 租户。
+> 作者信息（内容 / 回复）对用户做了隐私裁剪，仅暴露 `user` 摘要：`{"id", "user_name", "name", "avatar"}`，不含手机号 / 邮箱 / 租户。
 
 ### 2.2 Post（`osc_post`）
 
@@ -176,6 +177,20 @@ SSO 用户。
 
 > 与 `Post.like_count`（冗余计数）配套：计数用于列表展示，`PostLike` 记录用于判断「我是否已经点过赞」。同一用户对同一内容最多一条记录（`post_id + user_id` 唯一）。
 
+### 2.5 ProjectLike（`osc_project_like`）
+
+项目点赞记录，用于判断「当前用户是否已点赞某个项目（云效仓库）」。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 主键，自增 |
+| `project_id` | int | 项目 id（云效仓库 id） |
+| `user_id` | int | 点赞用户主键 id（`osc_user.id`） |
+| `created_at` | datetime | 创建时间 |
+| `updated_at` | datetime | 更新时间 |
+
+> 项目本身不落库（实时透传云效），点赞记录存本地；点赞数 = 该 `project_id` 的记录条数。同一用户对同一项目最多一条记录（`project_id + user_id` 唯一）。
+
 ---
 
 ## 3. 鉴权模块 /auth
@@ -231,6 +246,7 @@ SSO 用户。
     "user": {
       "id": 1,
       "user_name": "张三",
+      "name": "张三",
       "mobile": "13800000000",
       "email": null,
       "tenant": null,
@@ -287,7 +303,7 @@ SSO 用户。
 
 ### GET /posts
 
-内容列表（文章 / 问答），按创建时间倒序。仅返回已发布内容（`published`，草稿 / 待审核不对外展示）。每条记录附带 `liked`：当前用户是否已点赞（未登录时为 `false`）。
+内容列表（文章 / 问答），按创建时间倒序。仅返回已发布内容（`published`，草稿 / 待审核不对外展示）。每条记录附带 `liked`（当前用户是否已点赞，未登录时为 `false`）与 `user`（作者最小信息 `{id, user_name, avatar}`）。
 
 | 鉴权 | 无（可选 Bearer token，用于返回 `liked`） |
 | --- | --- |
@@ -326,7 +342,8 @@ SSO 用户。
         "published_at": "2026-09-14 10:00:00",
         "created_at": "2026-09-13 10:00:00",
         "updated_at": "2026-09-14 10:00:00",
-        "liked": false
+        "liked": false,
+        "user": { "id": 1, "user_name": "张三", "name": "张三", "avatar": null }
       }
     ]
   }
@@ -335,7 +352,7 @@ SSO 用户。
 
 ### GET /posts/mine
 
-个人中心：当前用户自己的全部内容（含 `draft` / `pending` / `published`），按创建时间倒序。附带 `liked` 字段。
+个人中心：当前用户自己的全部内容（含 `draft` / `pending` / `published`），按创建时间倒序。附带 `liked` 与 `user`（作者最小信息）字段。
 
 | 鉴权 | 是（Bearer token） |
 | --- | --- |
@@ -351,7 +368,7 @@ SSO 用户。
 
 **响应示例**
 
-`data` 为 `PageResult`，记录结构与 [GET /posts](#get-posts) 相同（含 `liked`）。
+`data` 为 `PageResult`，记录结构与 [GET /posts](#get-posts) 相同（含 `liked`、`user`）。
 
 ### POST /posts
 
@@ -424,7 +441,7 @@ SSO 用户。
     "created_at": "2026-09-13 10:00:00",
     "updated_at": "2026-09-14 10:00:00",
     "liked": false,
-    "user": { "id": 1, "user_name": "张三", "avatar": null }
+    "user": { "id": 1, "user_name": "张三", "name": "张三", "avatar": null }
   }
 }
 ```
@@ -595,7 +612,7 @@ SSO 用户。
         "is_deleted": false,
         "created_at": "2026-09-14 10:00:00",
         "updated_at": "2026-09-14 10:00:00",
-        "user": { "id": 1, "user_name": "张三", "avatar": null },
+        "user": { "id": 1, "user_name": "张三", "name": "张三", "avatar": null },
         "sub_reply_count": 2,
         "liked": true,
         "disliked": false
@@ -649,8 +666,8 @@ SSO 用户。
         "is_deleted": false,
         "created_at": "2026-09-14 11:00:00",
         "updated_at": "2026-09-14 11:00:00",
-        "user": { "id": 2, "user_name": "李四", "avatar": null },
-        "reply_to_user": { "id": 1, "user_name": "张三", "avatar": null },
+        "user": { "id": 2, "user_name": "李四", "name": "李四", "avatar": null },
+        "reply_to_user": { "id": 1, "user_name": "张三", "name": "张三", "avatar": null },
         "liked": false,
         "disliked": true
       }
@@ -832,7 +849,9 @@ SSO 用户。
         "creatorUid": "64743b3968eb1baac2f20886",
         "creator_name": "张三",
         "visibility": "private",
-        "starCount": 0
+        "starCount": 0,
+        "like_count": 2,
+        "liked": true
       }
     ]
   }
@@ -854,8 +873,10 @@ SSO 用户。
 | `creator_name` | string \| null | 创建者姓名（本地匹配，未同步到则 `null`） |
 | `visibility` | string | 可见性（如 `private`） |
 | `starCount` | int | 收藏数 |
+| `like_count` | int | 点赞数 |
+| `liked` | bool | 当前用户是否已点赞 |
 
-> 说明：`data` 中每条记录为云效仓库对象的原样透传（除追加 `creator_name` 外不做裁剪），还包含 `accessLevel`、`archived`、`creatorId`、`demoProject`、`encrypted`、`namespaceId`、`repositorySize`、`repositoryTags`、`starred`、`createdAt`、`lastActivityAt`、`updatedAt` 等原始字段，前端按需取用。总数 `totals` 取自响应头 `x-total`。
+> 说明：`data` 中每条记录为云效仓库对象的原样透传（除追加 `creator_name`、`like_count`、`liked` 外不做裁剪），还包含 `accessLevel`、`archived`、`creatorId`、`demoProject`、`encrypted`、`namespaceId`、`repositorySize`、`repositoryTags`、`starred`、`createdAt`、`lastActivityAt`、`updatedAt` 等原始字段，前端按需取用。总数 `totals` 取自响应头 `x-total`。
 
 ### GET /projects/{project_id}
 
@@ -885,9 +906,41 @@ SSO 用户。
     "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/FastOneTouch.git",
     "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch",
     "visibility": "private",
-    "starCount": 1
+    "starCount": 1,
+    "like_count": 2,
+    "liked": true
   }
 }
 ```
 
-> 说明：`data` 为云效仓库详情（`get_group_repositories_detail`）原样透传，字段包括 `id`、`name`、`nameWithNamespace`、`path`、`httpUrlToRepo`、`sshUrlToRepo`、`webUrl`、`visibility`、`starCount`、`defaultBranch`、`namespace`、`owner`、`permissions`、`wikiEnabled` 等。项目关联的文章/问答请用 [`GET /posts?project_id=`](#get-posts) 列表接口单独查询。
+> 说明：`data` 为云效仓库详情（`get_group_repositories_detail`）原样透传并追加 `like_count`、`liked`，字段包括 `id`、`name`、`nameWithNamespace`、`path`、`httpUrlToRepo`、`sshUrlToRepo`、`webUrl`、`visibility`、`starCount`、`defaultBranch`、`namespace`、`owner`、`permissions`、`wikiEnabled` 等。项目关联的文章/问答请用 [`GET /posts?project_id=`](#get-posts) 列表接口单独查询。
+
+### POST /projects/{project_id}/like
+
+点赞 / 取消赞（切换式）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `project_id` | int | 项目 id（云效仓库 id） |
+
+**行为说明（切换式）**
+
+| 当前状态 | 本次操作 | 结果 |
+| --- | --- | --- |
+| 未赞 | 点赞 | 记录 + 点赞数 +1 |
+| 已赞 | 再点赞 | 取消，点赞数 -1 |
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": { "liked": true, "like_count": 2 }
+}
+```

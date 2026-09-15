@@ -21,7 +21,7 @@ async def list_projects(
     session=Depends(get_session),
     user_id: int = Depends(dependencies.get_current_user),
 ) -> ApiResponse:
-    result = await project_center_service.list_repositories(session, page, page_size)
+    result = await project_center_service.list_repositories(session, page, page_size, user_id)
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
 
 
@@ -29,8 +29,19 @@ async def list_projects(
 async def get_project_detail(
     project_id: int,
     session=Depends(get_session),
-    _=Depends(dependencies.get_current_user),
+    user_id: int = Depends(dependencies.get_current_user),
 ) -> ApiResponse:
     """仓库详情（项目关联的文章/问答请用 /posts?project_id= 列表接口单独查询）。"""
-    detail = await project_center_service.get_repository_detail(session, project_id)
+    detail = await project_center_service.get_repository_detail(session, project_id, user_id)
     return ApiResponse(data=detail)
+
+
+@router.post("/{project_id}/like")
+async def like_project(
+    project_id: int,
+    session=Depends(get_session),
+    user_id: int = Depends(dependencies.get_current_user),
+) -> ApiResponse:
+    """点赞 / 取消赞（切换式）。"""
+    result = await project_center_service.like_project(session, project_id, user_id)
+    return ApiResponse(data=result)

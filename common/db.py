@@ -26,6 +26,7 @@ async def get_engine():
             database=settings.db_name,
             minsize=10,
             maxsize=20,
+            autocommit=True,
         )
     return mysql_engine
 
