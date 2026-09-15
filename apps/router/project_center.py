@@ -23,3 +23,14 @@ async def list_projects(
 ) -> ApiResponse:
     result = await project_center_service.list_repositories(session, page, page_size)
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
+
+
+@router.get("/{project_id}")
+async def get_project_detail(
+    project_id: int,
+    session=Depends(get_session),
+    _=Depends(dependencies.get_current_user),
+) -> ApiResponse:
+    """仓库详情（项目关联的文章/问答请用 /posts?project_id= 列表接口单独查询）。"""
+    detail = await project_center_service.get_repository_detail(session, project_id)
+    return ApiResponse(data=detail)

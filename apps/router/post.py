@@ -23,6 +23,7 @@ class PostUpdate(BaseModel):
     content: str | None = None
     summary: str | None = None
     tags: list[str] | None = None
+    project_id: int | None = None
 
 
 class PostStatusUpdate(BaseModel):
@@ -36,6 +37,7 @@ class PostCreate(PostStatusUpdate):
     summary: str | None = None
     tags: list[str] = []
     status: Literal["draft", "pending"] = "draft"
+    project_id: int | None = None
 
 
 @router.get("")
@@ -43,10 +45,11 @@ async def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     type: str | None = Query(None),
+    project_id: int | None = Query(None),
     session=Depends(get_session),
     user_id: int | None = Depends(dependencies.get_optional_user),
 ) -> ApiResponse:
-    result = await post_service.list_posts(session, page, page_size, type, user_id)
+    result = await post_service.list_posts(session, page, page_size, type, user_id, project_id)
     return ApiResponse(data=PageResult(totals=result["totals"], data=result["data"]))
 
 
@@ -78,6 +81,7 @@ async def create_post(
         summary=payload.summary,
         tags=payload.tags or [],
         status=payload.status,
+        project_id=payload.project_id,
     )
     await session.save(post)
     return ApiResponse(data=post)

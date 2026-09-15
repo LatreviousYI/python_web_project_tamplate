@@ -61,13 +61,75 @@ async def get_group_repositories(token, page=1, perpage=20):
         }
     ]
     """
-    login_out_url = f"{configs.settings.ali_yunxiao}/oapi/v1/codeup/organizations/5f278b52d248146039338d7b/groups/2090025/repositories"
+    url = f"{configs.settings.ali_yunxiao}/oapi/v1/codeup/organizations/5f278b52d248146039338d7b/groups/2090025/repositories"
     headers = {"x-yunxiao-token": token}
-    response = await httpx_utils.httpx_client.get(login_out_url, headers=headers, params={"page": page, "perpage": perpage})
+    response = await httpx_utils.httpx_client.get(url, headers=headers, params={"page": page, "perpage": perpage})
     if response.status_code != status.HTTP_200_OK:
         log_util.logger.error(f"获取代码组内仓库失败 {response.text}")
         response_utils.server_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "获取代码组内仓库失败")
     return response
+
+
+async def get_group_repositories_detail(token, repositories_id):
+    """
+    获取代码组内的仓库详情
+    {
+        "accessLevel": "30",
+        "allowPush": false,
+        "archived": false,
+        "cloneDownloadControlGray": true,
+        "createdAt": "2025-11-06T10:57:02+08:00",
+        "creatorId": 1235264,
+        "defaultBranch": "master",
+        "demoProject": false,
+        "enableCloneDownloadControl": true,
+        "forkCount": 0,
+        "httpUrlToRepo": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch.git",
+        "id": 5940858,
+        "lastActivityAt": "2026-09-09T15:29:59+08:00",
+        "mergeRequestsEnabled": true,
+        "name": "OneTouch",
+        "nameWithNamespace": "5f278b52d248146039338d7b / ai / OneTouch",
+        "namespace": {
+            "createdAt": "2023-08-18T18:02:39+08:00",
+            "description": "ai小组用",
+            "id": 1221832,
+            "name": "ai",
+            "ownerId": 1119475,
+            "path": "ai",
+            "updatedAt": "2023-08-18T18:02:39+08:00",
+            "visibility": "private"
+        },
+        "openCloneDownloadControl": false,
+        "owner": {
+            "id": 1235264,
+            "webUrl": ""
+        },
+        "path": "FastOneTouch",
+        "pathWithNamespace": "5f278b52d248146039338d7b/ai/FastOneTouch",
+        "permissions": {
+            "groupAccess": null,
+            "projectAccess": null
+        },
+        "projectType": 1,
+        "repositorySize": "3.18945",
+        "repositoryTags": [],
+        "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/FastOneTouch.git",
+        "starCount": 1,
+        "tagList": [],
+        "updatedAt": "2026-09-09T15:29:59+08:00",
+        "visibility": "private",
+        "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch",
+        "wikiEnabled": true
+    }
+    """
+    url = f"{configs.settings.ali_yunxiao}/oapi/v1/codeup/organizations/5f278b52d248146039338d7b/repositories/{repositories_id}"
+    headers = {"x-yunxiao-token": token}
+    response = await httpx_utils.httpx_client.get(url, headers=headers)
+    if response.status_code != status.HTTP_200_OK:
+        log_util.logger.error(f"获取代码组内仓库详情失败 {response.text}")
+        response_utils.server_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "获取代码组内仓库详情失败")
+    return response.json()
 
 
 async def get_ali_yunxiao_user(token, page=1, perpage=20):
@@ -109,9 +171,9 @@ async def get_ali_yunxiao_user(token, page=1, perpage=20):
         }
     ]
     """
-    login_out_url = f"{configs.settings.ali_yunxiao}/oapi/v1/platform/organizations/5f278b52d248146039338d7b/members"
+    url = f"{configs.settings.ali_yunxiao}/oapi/v1/platform/organizations/5f278b52d248146039338d7b/members"
     headers = {"x-yunxiao-token": token}
-    response = await httpx_utils.httpx_client.get(login_out_url, headers=headers, params={"page": page, "perpage": perpage})
+    response = await httpx_utils.httpx_client.get(url, headers=headers, params={"page": page, "perpage": perpage})
     if response.status_code != status.HTTP_200_OK:
         log_util.logger.error(f"获取用户失败 {response.text}")
         response_utils.server_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "获取用户失败")

@@ -18,6 +18,7 @@ class Post(BaseField):
         table = "osc_post"
 
     user_id: int = Field(index=True, comment="作者用户主键id（osc_user.id）")
+    project_id: Optional[int] = Field(default=None, index=True, nullable=True, comment="关联项目id（项目中心云效仓库id，可空）")
     type: str = Field(max_length=16, comment="类型: article / qa")
     title: str = Field(max_length=200, comment="标题")
     summary: Optional[str] = Field(default=None, max_length=500, nullable=True, comment="摘要")

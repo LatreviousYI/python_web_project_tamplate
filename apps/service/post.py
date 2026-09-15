@@ -37,10 +37,13 @@ async def list_posts(
     page_size: int = 20,
     post_type: Optional[str] = None,
     user_id: Optional[int] = None,
+    project_id: Optional[int] = None,
 ) -> dict:
     query = session.query(Post).filter(Post.status == "published")  # 仅已发布对外展示（草稿/待审核走个人中心）
     if post_type:
         query = query.filter(Post.type == post_type)
+    if project_id is not None:
+        query = query.filter(Post.project_id == project_id)
     totals = await query.count()
     posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
@@ -77,6 +80,7 @@ async def create_post(
     post_type: str = "article",
     summary: Optional[str] = None,
     tags: Optional[list[str]] = None,
+    project_id: Optional[int] = None,
 ) -> Post:
     post = Post(
         user_id=user_id,
@@ -85,6 +89,7 @@ async def create_post(
         content=content,
         summary=summary,
         tags=tags or [],
+        project_id=project_id,
     )
     await session.save(post)
     return post

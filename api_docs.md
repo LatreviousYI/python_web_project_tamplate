@@ -125,6 +125,7 @@ SSO 用户。
 | --- | --- | --- |
 | `id` | int | 主键，自增 |
 | `user_id` | int | 作者用户主键 id（`osc_user.id`） |
+| `project_id` | int \| null | 关联项目 id（项目中心云效仓库 id），可空 |
 | `type` | string | 类型：`article` / `qa` |
 | `title` | string | 标题 |
 | `summary` | string \| null | 摘要 |
@@ -137,6 +138,8 @@ SSO 用户。
 | `published_at` | datetime \| null | 发布时间 |
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
+
+> `project_id` 为逻辑关联（不建外键约束），指向项目中心（云效）的仓库 id；项目名称等元信息由 [`GET /projects`](#8-项目中心模块-projects) 提供，前端按 `project_id` 自行关联。
 
 ### 2.3 Reply（`osc_reply`）
 
@@ -296,6 +299,7 @@ SSO 用户。
 | `page` | int | 1 | 页码，`>= 1` |
 | `page_size` | int | 20 | 每页条数，`1 ~ 100` |
 | `type` | string | — | 可选，按类型筛选：`article` / `qa` |
+| `project_id` | int | — | 可选，按项目筛选（云效仓库 id） |
 
 **响应示例**
 
@@ -309,6 +313,7 @@ SSO 用户。
       {
         "id": 10,
         "user_id": 1,
+        "project_id": 4282444,
         "type": "article",
         "title": "标题",
         "summary": "摘要",
@@ -364,7 +369,8 @@ SSO 用户。
   "type": "article",
   "status": "draft",
   "summary": "摘要",
-  "tags": ["Python"]
+  "tags": ["Python"],
+  "project_id": 4282444
 }
 ```
 
@@ -376,6 +382,7 @@ SSO 用户。
 | `status` | string | 否 | 初始状态：`draft` / `pending`，默认 `draft` |
 | `summary` | string \| null | 否 | 摘要 |
 | `tags` | array | 否 | 标签列表，默认 `[]` |
+| `project_id` | int \| null | 否 | 关联项目 id（项目中心云效仓库 id），默认 `null` |
 
 **响应示例**
 
@@ -403,6 +410,7 @@ SSO 用户。
   "data": {
     "id": 10,
     "user_id": 1,
+    "project_id": 4282444,
     "type": "article",
     "title": "标题",
     "summary": "摘要",
@@ -439,7 +447,7 @@ SSO 用户。
 **请求体**（均为可选，`null` 表示不更新）
 
 ```json
-{ "title": "新标题", "content": "# 新正文", "summary": "新摘要", "tags": ["A", "B"] }
+{ "title": "新标题", "content": "# 新正文", "summary": "新摘要", "tags": ["A", "B"], "project_id": 4282444 }
 ```
 
 | 字段 | 类型 | 说明 |
@@ -448,6 +456,7 @@ SSO 用户。
 | `content` | string \| null | 正文 |
 | `summary` | string \| null | 摘要 |
 | `tags` | array \| null | 标签列表 |
+| `project_id` | int \| null | 关联项目 id |
 
 **响应示例**
 
@@ -847,3 +856,38 @@ SSO 用户。
 | `starCount` | int | 收藏数 |
 
 > 说明：`data` 中每条记录为云效仓库对象的原样透传（除追加 `creator_name` 外不做裁剪），还包含 `accessLevel`、`archived`、`creatorId`、`demoProject`、`encrypted`、`namespaceId`、`repositorySize`、`repositoryTags`、`starred`、`createdAt`、`lastActivityAt`、`updatedAt` 等原始字段，前端按需取用。总数 `totals` 取自响应头 `x-total`。
+
+### GET /projects/{project_id}
+
+单个仓库详情。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `project_id` | int | 仓库 id（云效仓库 id） |
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 5940858,
+    "name": "OneTouch",
+    "nameWithNamespace": "5f278b52d248146039338d7b / ai / OneTouch",
+    "path": "FastOneTouch",
+    "httpUrlToRepo": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch.git",
+    "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/FastOneTouch.git",
+    "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch",
+    "visibility": "private",
+    "starCount": 1
+  }
+}
+```
+
+> 说明：`data` 为云效仓库详情（`get_group_repositories_detail`）原样透传，字段包括 `id`、`name`、`nameWithNamespace`、`path`、`httpUrlToRepo`、`sshUrlToRepo`、`webUrl`、`visibility`、`starCount`、`defaultBranch`、`namespace`、`owner`、`permissions`、`wikiEnabled` 等。项目关联的文章/问答请用 [`GET /posts?project_id=`](#get-posts) 列表接口单独查询。

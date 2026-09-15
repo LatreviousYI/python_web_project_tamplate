@@ -82,3 +82,11 @@ async def list_repositories(session: Session, page: int = 1, page_size: int = 20
 
     data = [{**r, "creator_name": name_map.get(r.get("creatorUid"))} for r in repos]
     return {"totals": totals, "data": data}
+
+
+async def get_repository_detail(session: Session, project_id: int) -> dict | None:
+    """获取单个仓库详情。token 未配置时返回 None。"""
+    token = await _get_ali_yunxiao_token(session)
+    if not token:
+        return None
+    return await ali_yunxiao.get_group_repositories_detail(token, project_id)

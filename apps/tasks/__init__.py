@@ -16,7 +16,7 @@ def start_scheduler() -> AsyncIOScheduler:
     # 每天 0 点同步云效用户（用于仓库列表 creatorUid → 姓名的展示匹配）
     scheduler.add_job(
         sync_yunxiao_user_job,
-        CronTrigger(hour=10, minute=40),
+        CronTrigger(hour=13, minute=49),
         id="sync_yunxiao_user",
         name="同步云效用户",
         replace_existing=True,
