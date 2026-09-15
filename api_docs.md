@@ -13,6 +13,7 @@
 - [5. 内容模块 /posts](#5-内容模块-posts)
 - [6. 回复模块 /replies](#6-回复模块-replies)
 - [7. 通用模块 /common](#7-通用模块-common)
+- [8. 项目中心模块 /projects](#8-项目中心模块-projects)
 
 ---
 
@@ -783,3 +784,66 @@ SSO 用户。
 **响应**
 
 `302` 跳转到 OSS 签名 URL（有效期 2 小时）。
+
+---
+
+## 8. 项目中心模块 /projects
+
+### GET /projects
+
+代码仓库（项目）列表，分页。数据直接透传阿里云效 `get_group_repositories` 的仓库对象，并额外匹配出 `creator_name`（创建者姓名，由 `creatorUid` 关联本地云效成员表 `osc_yunxiao_user` 得到，未匹配到时为 `null`）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求参数（query）**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `page` | int | 1 | 页码，`>= 1` |
+| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "totals": 12,
+    "data": [
+      {
+        "id": 4282444,
+        "name": "auto-recruit",
+        "nameWithNamespace": "5f278b52d248146039338d7b / ai / auto-recruit",
+        "path": "auto-recruit",
+        "httpUrlToRepo": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/auto-recruit.git",
+        "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/auto-recruit.git",
+        "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/auto-recruit",
+        "creatorUid": "64743b3968eb1baac2f20886",
+        "creator_name": "张三",
+        "visibility": "private",
+        "starCount": 0
+      }
+    ]
+  }
+}
+```
+
+**主要字段说明**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 仓库 id |
+| `name` | string | 仓库名 |
+| `nameWithNamespace` | string | 带命名空间的全名 |
+| `path` | string | 仓库路径 |
+| `httpUrlToRepo` | string | HTTP 克隆地址 |
+| `sshUrlToRepo` | string | SSH 克隆地址 |
+| `webUrl` | string | 网页地址 |
+| `creatorUid` | string | 创建者 userId（对应云效成员 `userId`） |
+| `creator_name` | string \| null | 创建者姓名（本地匹配，未同步到则 `null`） |
+| `visibility` | string | 可见性（如 `private`） |
+| `starCount` | int | 收藏数 |
+
+> 说明：`data` 中每条记录为云效仓库对象的原样透传（除追加 `creator_name` 外不做裁剪），还包含 `accessLevel`、`archived`、`creatorId`、`demoProject`、`encrypted`、`namespaceId`、`repositorySize`、`repositoryTags`、`starred`、`createdAt`、`lastActivityAt`、`updatedAt` 等原始字段，前端按需取用。总数 `totals` 取自响应头 `x-total`。

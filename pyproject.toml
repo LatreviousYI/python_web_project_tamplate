@@ -16,6 +16,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     "orjson>=3.9.0",
     "httpx>=0.28.1",
+    "apscheduler[asyncio]>=3.11.3",
 ]
 
 

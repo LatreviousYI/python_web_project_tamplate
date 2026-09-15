@@ -22,3 +22,6 @@ class BaseSettings:
     oss_access_key_secret = "rXyarn206sUswoIwOky0wlJBGCPUg5hCK2Ep2vHpcp4="
     oss_endpoint = "https://oss-cn-shanghai.aliyuncs.com"
     oss_bucket_name = "ai-hrbp-prod"
+
+    ali_yunxiao = "https://openapi-rdc.aliyuncs.com"
+    ali_yunxiao_token = ""  # 云效 OpenAPI 访问令牌（x-yunxiao-token），TODO: 填写实际值
