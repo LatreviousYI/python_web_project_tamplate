@@ -16,6 +16,8 @@ from vorm import Session, col
 from apps.model.auth import User
 from apps.model.post import Post
 from apps.model.reply import Reply, ReplyVote
+from apps.service import notification as notification_service
+from utils import log_util
 from utils.response_utils import abort
 
 
@@ -179,7 +181,30 @@ async def create_reply(
     await session.save(reply)
     # 回写内容回复数：原子自增（model 层统一封装）
     await Post.incr_count(session, post_id, "reply_count")
+    # 回复通知：一级回复通知帖子作者，二级回复通知被回复者（best-effort，失败不影响回复）
+    await _notify_reply(session, post, reply)
     return reply
+
+
+async def _notify_reply(session: Session, post: Post, reply: Reply) -> None:
+    """写回复通知：一级回复通知帖子作者，二级回复通知被回复者。
+
+    通知写入 best-effort：失败只记日志，不影响回复本身。
+    """
+    recipient = reply.reply_to_user_id if reply.reply_to_user_id is not None else post.user_id
+    snippet = reply.content[:100] if reply.content else None
+    try:
+        await notification_service.create_notification(
+            session,
+            recipient_id=recipient,
+            actor_id=reply.user_id,
+            type="reply",
+            post_id=post.id,
+            reply_id=reply.id,
+            content=snippet,
+        )
+    except Exception:
+        log_util.logger.exception("回复通知写入失败: reply_id=%s", reply.id)
 
 
 async def delete_reply(session: Session, reply_id: int, user_id: int) -> Reply | None:

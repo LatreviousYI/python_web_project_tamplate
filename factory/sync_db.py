@@ -1,5 +1,6 @@
 from apps.model.auth import User
 from apps.model.common import DistributedLock, KeyValue
+from apps.model.notification import Notification
 from apps.model.post import Post, PostLike
 from apps.model.reply import Reply, ReplyVote
 from apps.model.project_center import ProjectLike, YunxiaoUser
@@ -7,7 +8,7 @@ from apps.service.lock import acquire_lock
 from common.db import get_asynccontext_session
 
 
-db_list = (User, Post, Reply, ReplyVote, PostLike, YunxiaoUser, ProjectLike, KeyValue, DistributedLock)
+db_list = (User, Post, Reply, ReplyVote, PostLike, Notification, YunxiaoUser, ProjectLike, KeyValue, DistributedLock)
 
 
 async def sync_db():

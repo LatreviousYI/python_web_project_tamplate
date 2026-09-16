@@ -12,6 +12,7 @@ from vorm import Session, col
 
 from apps.model.auth import User
 from apps.model.post import Post, PostLike
+from apps.service import notification as notification_service
 from utils import betteryeah_utils, log_util
 from utils.response_utils import abort
 
@@ -204,11 +205,31 @@ async def review_pending_posts(session: Session, limit: int = 50) -> int:
             continue
         if result["pass"] is True:
             await publish_post(session, post.id)
+            await _notify_review(session, post, "approve", "你的内容已通过审核")
         else:
+            reason = result.get("reason") or "内容不合规"
             await reject_post(session, post.id)
-            log_util.logger.info("内容审核不通过: post_id=%s, reason=%s", post.id, result.get("reason"))
+            await _notify_review(session, post, "reject", reason)
+            log_util.logger.info("内容审核不通过: post_id=%s, reason=%s", post.id, reason)
         reviewed += 1
     return reviewed
+
+
+async def _notify_review(session: Session, post: Post, type: str, content: str) -> None:
+    """写审核结果通知：通过 / 不通过（系统通知，actor 为空）。
+
+    通知写入 best-effort：失败只记日志，不影响审核主流程。
+    """
+    try:
+        await notification_service.create_notification(
+            session,
+            recipient_id=post.user_id,
+            type=type,
+            post_id=post.id,
+            content=content,
+        )
+    except Exception:
+        log_util.logger.exception("审核通知写入失败: post_id=%s", post.id)
 
 
 async def like_post(session: Session, post_id: int, user_id: int) -> Post | None:

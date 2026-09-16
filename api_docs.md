@@ -2,7 +2,7 @@
 
 > 基础路径：`/api/v1`
 > 协议：HTTP/HTTPS · 数据格式：JSON（UTF-8）
-> 生成日期：2026-09-14
+> 更新日期：2026-09-16
 
 ## 目录
 
@@ -14,6 +14,7 @@
 - [6. 回复模块 /replies](#6-回复模块-replies)
 - [7. 通用模块 /common](#7-通用模块-common)
 - [8. 项目中心模块 /projects](#8-项目中心模块-projects)
+- [9. 通知模块 /notifications](#9-通知模块-notifications)
 
 ---
 
@@ -944,3 +945,274 @@ SSO 用户。
   "data": { "liked": true, "like_count": 2 }
 }
 ```
+
+---
+
+## 9. 通知模块 /notifications
+
+站内通知用于提醒用户收到回复，以及自己的文章 / 问答审核结果。通知只属于当前登录用户，所有接口都需要携带 Bearer token。
+
+### 9.1 Notification 数据模型（`osc_notification`）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 主键，自增 |
+| `recipient_id` | int | 收件人用户主键 id（`osc_user.id`） |
+| `actor_id` | int \| null | 触发者用户主键 id；系统审核通知为 `null` |
+| `type` | string | 通知类型：`reply` / `approve` / `reject` |
+| `post_id` | int \| null | 关联文章 / 问答 id（`osc_post.id`） |
+| `reply_id` | int \| null | 关联回复 id，回复通知有值 |
+| `content` | string \| null | 回复内容摘要或审核原因 |
+| `is_read` | bool | 是否已读 |
+| `read_at` | datetime \| null | 已读时间；未读时为 `null` |
+| `created_at` | datetime | 通知创建时间 |
+| `updated_at` | datetime | 更新时间 |
+
+**通知触发规则**
+
+- 其他用户回复我的文章 / 问答时，生成 `reply` 通知。
+- 审核通过时，生成 `approve` 通知，内容为“你的内容已通过审核”。
+- 审核不通过时，生成 `reject` 通知，`content` 保存审核服务返回的原因；内容状态仍按原逻辑由 `pending` 退回 `draft`。
+- 点赞文章 / 问答不会生成通知。
+- 自己回复自己的文章 / 问答不会生成通知。
+- 通知写入失败不会影响回复或审核主流程，服务端会记录错误日志。
+
+通知列表中的 `actor` 和 `post_title` 是接口额外返回的展示字段：
+
+- `actor`：触发者摘要 `{id, user_name, name, avatar}`；系统通知为 `null`。
+- `post_title`：关联内容标题；关联内容已删除时为 `null`。
+
+### 9.2 GET /notifications
+
+获取当前用户的通知列表，按通知创建时间倒序分页。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求参数（query）**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `page` | int | 1 | 页码，`>= 1` |
+| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `unread` | bool \| null | — | 传 `true` 时只查询未读通知；不传时返回全部通知 |
+
+**请求示例**
+
+```http
+GET /api/v1/notifications?page=1&page_size=20&unread=true
+Authorization: Bearer <token>
+```
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "totals": 2,
+    "data": [
+      {
+        "id": 101,
+        "recipient_id": 1,
+        "actor_id": 2,
+        "type": "reply",
+        "post_id": 10,
+        "reply_id": 35,
+        "content": "这个方案很有帮助。",
+        "is_read": false,
+        "read_at": null,
+        "created_at": "2026-09-16 10:00:00",
+        "updated_at": "2026-09-16 10:00:00",
+        "actor": {
+          "id": 2,
+          "user_name": "李四",
+          "name": "李四",
+          "avatar": null
+        },
+        "post_title": "FastAPI 项目实践"
+      },
+      {
+        "id": 100,
+        "recipient_id": 1,
+        "actor_id": null,
+        "type": "reject",
+        "post_id": 11,
+        "reply_id": null,
+        "content": "包含不合规内容",
+        "is_read": false,
+        "read_at": null,
+        "created_at": "2026-09-16 09:30:00",
+        "updated_at": "2026-09-16 09:30:00",
+        "actor": null,
+        "post_title": "我的技术问答"
+      }
+    ]
+  }
+}
+```
+
+> `totals` 是当前筛选条件下的通知总数，不是未读数量。获取未读数量请使用 [GET /notifications/unread-count](#get-notificationsunread-count)。
+
+### 9.3 GET /notifications/unread-count
+
+获取当前用户的未读通知数量。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求示例**
+
+```http
+GET /api/v1/notifications/unread-count
+Authorization: Bearer <token>
+```
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "count": 5
+  }
+}
+```
+
+### 9.4 POST /notifications/{notification_id}/read
+
+将指定通知标记为已读。只能操作当前登录用户自己的通知；通知不存在或不属于当前用户时返回业务 `code=404`。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `notification_id` | int | 通知 id |
+
+**请求示例**
+
+```http
+POST /api/v1/notifications/101/read
+Authorization: Bearer <token>
+```
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+**通知不存在或无权限响应**
+
+```json
+{
+  "code": 404,
+  "message": "notification not found",
+  "data": null
+}
+```
+
+> 重复调用是幂等的：已经是已读状态时仍返回成功，不会修改原有 `read_at`。
+
+### 9.5 POST /notifications/read-all
+
+将当前登录用户的全部未读通知标记为已读。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求示例**
+
+```http
+POST /api/v1/notifications/read-all
+Authorization: Bearer <token>
+```
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+> 重复调用是幂等的；接口只更新当前用户的通知，不会影响其他用户。接口返回成功后，可通过未读数接口确认 `count` 为 `0`。
+
+### 9.6 DELETE /notifications/{notification_id}
+
+删除当前用户的一条通知。只能删除自己的通知；通知不存在或不属于当前用户时返回业务 `code=404`。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `notification_id` | int | 通知 id |
+
+**请求示例**
+
+```http
+DELETE /api/v1/notifications/101
+Authorization: Bearer <token>
+```
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+**通知不存在或无权限响应**
+
+```json
+{
+  "code": 404,
+  "message": "notification not found",
+  "data": null
+}
+```
+
+> 删除操作不可恢复；删除已读或未读通知均可，删除通知不会影响未读数量以外的业务数据。
+
+### 9.7 DELETE /notifications/read-all
+
+删除当前用户的全部已读通知，不会删除未读通知。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求示例**
+
+```http
+DELETE /api/v1/notifications/read-all
+Authorization: Bearer <token>
+```
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+> 接口是幂等的：没有已读通知时也返回成功；只影响当前用户的已读通知，删除后不可恢复。

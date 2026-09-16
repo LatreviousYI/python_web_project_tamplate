@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.router import auth, common, home, post, project_center, reply
+from apps.router import auth, common, home, notification, post, project_center, reply
 from apps.service.lock import cleanup_expired_locks
 from apps.tasks import start_forerver_loop, start_scheduler
 from common.db import get_engine
@@ -22,6 +22,7 @@ def register_routers(app: FastAPI):
     api_router.include_router(reply.router)
     api_router.include_router(common.router)
     api_router.include_router(project_center.router)
+    api_router.include_router(notification.router)
     app.include_router(api_router)
 
 
