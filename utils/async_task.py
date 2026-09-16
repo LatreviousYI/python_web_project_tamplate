@@ -6,6 +6,7 @@
 
 import asyncio
 
+
 import configs
 from utils import log_util
 
@@ -36,12 +37,13 @@ def create_task_with_safe(coro):
     coro_task.add_done_callback(configs.settings.background_tasks.discard)
 
 
-def shutdown_forever_task():
+async def shutdown_forever_task():
     configs.settings.background_tasks_shutdown_stauts = 1
     while True:
         if not configs.settings.background_tasks:
             return
         else:
+            await asyncio.sleep(1)
             log_util.logger.info(f"还有{len(configs.settings.background_tasks)}个任务未关闭")
 
 

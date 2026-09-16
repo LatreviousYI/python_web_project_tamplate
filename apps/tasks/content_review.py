@@ -16,7 +16,7 @@ from utils import log_util
 # 单批最多处理条数，防止积压过多导致单批耗时过长；剩余留待下一轮继续
 _BATCH_SIZE = 50
 # 空闲（无待审核内容）时的轮询间隔（秒）
-_IDLE_SLEEP_SECONDS = 60
+_IDLE_SLEEP_SECONDS = 10
 _LOCK_KEY = "review_pending_posts"
 
 
@@ -27,6 +27,7 @@ async def review_pending_posts_loop() -> None:
         return
     while True:
         if configs.settings.background_tasks_shutdown_stauts == 1:
+            log_util.logger.debug("程序关闭")
             return
         async with get_asynccontext_session() as session:
             # 分布式锁：多实例时保证同一时刻只有一个实例在审核；每批获取、处理完立即释放

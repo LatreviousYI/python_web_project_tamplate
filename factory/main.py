@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    shutdown_forever_task()
+    await shutdown_forever_task()
     scheduler.shutdown()
     await httpx_utils.close_httpx()
     await engine.close()
