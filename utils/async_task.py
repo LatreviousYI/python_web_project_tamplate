@@ -36,6 +36,15 @@ def create_task_with_safe(coro):
     coro_task.add_done_callback(configs.settings.background_tasks.discard)
 
 
+def shutdown_forever_task():
+    configs.settings.background_tasks_shutdown_stauts = 1
+    while True:
+        if not configs.settings.background_tasks:
+            return
+        else:
+            log_util.logger.info(f"还有{len(configs.settings.background_tasks)}个任务未关闭")
+
+
 class TaskQueue:
     def __init__(self, task_queue_limit=None):
         self.task_queue = set()

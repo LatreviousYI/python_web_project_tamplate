@@ -6,6 +6,8 @@
 接库后在 factory/main.py 的 lifespan 中调用 get_engine() 并 sync_table() 建表。
 """
 
+from contextlib import asynccontextmanager
+
 from vorm import create_mysql_engine
 
 from configs import settings
@@ -33,6 +35,17 @@ async def get_engine():
 
 async def get_session():
     """FastAPI 依赖：提供一个 vorm Session（请求结束自动关闭）。"""
+    engine = await get_engine()
+    session = engine.session()
+    try:
+        yield session
+    finally:
+        await session.close()
+
+
+@asynccontextmanager
+async def get_asynccontext_session():
+    """提供一个 vorm Session（自动关闭）。"""
     engine = await get_engine()
     session = engine.session()
     try:

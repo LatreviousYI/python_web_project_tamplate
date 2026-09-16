@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.router import auth, common, home, post, project_center, reply
 from apps.service.lock import cleanup_expired_locks
-from apps.tasks import start_scheduler
+from apps.tasks import start_forerver_loop, start_scheduler
+from common.db import get_engine
 from factory.middleware import register_error_handlers
 from factory.sync_db import sync_db
 from utils import httpx_utils
+from utils.async_task import shutdown_forever_task
 
 
 def register_routers(app: FastAPI):
@@ -40,13 +42,18 @@ def create_app() -> FastAPI:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    engine = await get_engine()
     await sync_db()
     await cleanup_expired_locks()
     scheduler = start_scheduler()
+    start_forerver_loop()
+
     yield
 
+    shutdown_forever_task()
     scheduler.shutdown()
     await httpx_utils.close_httpx()
+    await engine.close()
 
 
 app = create_app()

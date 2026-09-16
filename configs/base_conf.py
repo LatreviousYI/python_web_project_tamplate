@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 class BaseSettings:
+    sec_key = ""
     app_name = "open_source_community"
     # 为了解决create_task方法弱引用问题
     background_tasks = set()
@@ -25,3 +26,8 @@ class BaseSettings:
 
     ali_yunxiao = "https://openapi-rdc.aliyuncs.com"
     ali_yunxiao_token = ""  # 云效 OpenAPI 访问令牌（x-yunxiao-token），TODO: 填写实际值
+
+    better_yeah_url = "https://ai-api.betteryeah.com/v1"
+
+    access_key = "/ogFPRpT+ELG8/4FnRzz6eYv0LWZud1rzBoV3wvrExSyJYk5H2u8cjFSYhHFSqRCSle77UzBJeJSoZ9d0Y/tHg=="
+    workspace_id = "6502cef03625242769fa1b56"

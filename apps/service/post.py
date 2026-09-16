@@ -12,6 +12,7 @@ from vorm import Session, col
 
 from apps.model.auth import User
 from apps.model.post import Post, PostLike
+from utils import betteryeah_utils, log_util
 from utils.response_utils import abort
 
 # 用户可切换的状态：草稿 ↔ 待审核；published 只能由系统审核通过后置入
@@ -180,6 +181,34 @@ async def reject_post(session: Session, post_id: int) -> Post | None:
     post.status = "draft"
     await session.save(post)
     return post
+
+
+async def review_pending_posts(session: Session, limit: int = 50) -> int:
+    """自动审核待发布内容：调用 AI 内容审核，通过则发布，不通过则打回草稿。
+
+    逐个处理 status == pending 的内容（按 id 升序，最多 limit 条）。
+    单个内容审核异常 / 返回结构异常时跳过并保持 pending，等待下一次任务重试。
+    返回本次实际处理的条数。
+    """
+    posts = await session.query(Post).filter(Post.status == "pending").order_by(col(Post.id).asc()).limit(limit).all()
+    reviewed = 0
+    for post in posts:
+        # 标题 + 正文一起送审，便于 AI 综合判断
+        try:
+            result = await betteryeah_utils.verfiy_content(f"{post.title}\n{post.summary}\n{post.content}")
+        except Exception:
+            log_util.logger.exception("内容审核调用失败: post_id=%s", post.id)
+            continue
+        if not isinstance(result, dict) or "pass" not in result:
+            log_util.logger.warning("内容审核返回异常: post_id=%s, result=%s", post.id, result)
+            continue
+        if result["pass"] is True:
+            await publish_post(session, post.id)
+        else:
+            await reject_post(session, post.id)
+            log_util.logger.info("内容审核不通过: post_id=%s, reason=%s", post.id, result.get("reason"))
+        reviewed += 1
+    return reviewed
 
 
 async def like_post(session: Session, post_id: int, user_id: int) -> Post | None:

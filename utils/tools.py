@@ -15,10 +15,8 @@ import datetime
 import random
 import decimal
 from collections import Counter, defaultdict
-from urllib import parse
 import aiofiles
 from fastapi.responses import JSONResponse
-from openpyxl import Workbook
 import orjson
 
 from utils import log_util
@@ -69,42 +67,36 @@ def timestamp_to_string():
     return str(int(datetime.datetime.now().timestamp() * 1000))
 
 
-class JsonExtendEncoder(orjson.JSONEncodeError):
-    """扩展的JSON编码器，支持日期时间、日期、小数、字节等类型"""
-
-    def default(self, obj):
-        # 处理元组、列表、日期时间
-        if isinstance(obj, (tuple, list, datetime.datetime)):
-            return obj.strftime("%Y-%m-%d %H:%M:%S")
-        # 处理日期
-        elif isinstance(obj, datetime.date):
-            return obj.strftime("%Y-%m-%d")
-        # 处理小数
-        elif isinstance(obj, decimal.Decimal):
-            return float(obj)
-        # 处理字节
-        elif isinstance(obj, bytes):
-            return obj.decode("utf-8")
-        return super().default(obj)
+def _json_default(obj):
+    """orjson 自定义序列化回调：日期时间 → 'YYYY-MM-DD HH:MM:SS'、日期 → 'YYYY-MM-DD'、小数 → float、字节 → utf-8 字符串。"""
+    if isinstance(obj, datetime.datetime):
+        return obj.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(obj, datetime.date):
+        return obj.strftime("%Y-%m-%d")
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8")
+    raise TypeError
 
 
 class JsonExtendResponse(JSONResponse):
     """使用扩展编码器的JSON响应"""
 
     def render(self, content):
-        return orjson.dumps(content, cls=JsonExtendEncoder).encode("utf-8")
+        return orjson.dumps(content, default=_json_default)
 
 
 def dict_to_json(data):
     """将字典转换为JSON字符串"""
     if not data:
         data = {}
-    return orjson.dumps(data, cls=JsonExtendEncoder)
+    return orjson.dumps(data, default=_json_default).decode("utf-8")
 
 
 def dict_to_json_ea(data=None):
-    """将字典转换为JSON字符串（保留中文字符）"""
-    return orjson.dumps(data, cls=JsonExtendEncoder, ensure_ascii=False)
+    """将字典转换为JSON字符串（orjson 默认输出 UTF-8，中文不会被转义）"""
+    return orjson.dumps(data, default=_json_default).decode("utf-8")
 
 
 def json_to_dict(json_data):
@@ -277,20 +269,10 @@ def time_str_to_datetime(time_str: str) -> datetime.datetime:
     return datetime.datetime.strptime(time_str, get_format_str(time_str))
 
 
-def trans_to_chinese(s: str):
-    """将Unicode转义字符串转换回中文"""
-    try:
-        s = s.encode("unicode_escape")
-        return parse.unquote(s.decode("utf-8").replace("\\x", "%"))
-    except Exception as e:
-        log_util.logger.exception(e)
-        return ""
-
-
 def is_strict_datetime_format(date_str):
     """验证日期字符串是否符合 YYYY-MM-DD HH:MM 格式"""
     try:
-        datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+        datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M")
         return True
     except ValueError:
         return False
@@ -315,39 +297,6 @@ def get_md5(s):
     if not s:
         return ""
     return hashlib.md5(s.encode("utf-8")).hexdigest()
-
-
-def write_xlsx(
-    data: list[dict],
-    path: str,
-    header: dict | None = None,
-    exclude_field: list | None = None,
-):
-    """
-    将数据写入Excel文件
-
-    Args:
-        data: 要写入的数据列表
-        path: 文件保存路径
-        header: 表头映射，key为原字段名，value为显示名称
-        exclude_field: 要排除的字段列表
-    """
-    workbook = Workbook()
-    worksheet = workbook.active
-    i = 0
-    for row in data:
-        row_to_write = dict(row)
-        for field in exclude_field or []:
-            row_to_write.pop(field, None)
-        if i == 0:
-            if header:
-                keys = list(row_to_write.keys())
-                worksheet.append([header[k] for k in keys])
-            else:
-                worksheet.append(list(row_to_write.keys()))
-            i += 1
-        worksheet.append(list(row_to_write.values()))
-    workbook.save(path)
 
 
 def remove_duplicates(my_list: list):
@@ -560,30 +509,5 @@ def local_datetime_to_utc_str(local_dt: str) -> str:
     return utc_time_str
 
 
-def utc_str_to_local_datetime(utc_dt: str) -> str:
-    """
-    将 UTC 时间转换为系统本地时间。
-
-    Args:
-        utc_dt: UTC 时间的 datetime 对象
-
-    Returns:
-        转换后的本地时间 datetime 对象
-    """
-    # 如果传入的 datetime 没有时区信息，先标记为 UTC
-    utc_dt = parse_datetime(utc_dt)
-    if utc_dt.tzinfo is None:
-        utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
-
-    # 转换为系统本地时间
-    local_dt = utc_dt.astimezone(tz=None)
-    return local_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
 def str_time_tran_file_name(time_str: str):
     return time_str.replace(" ", "_").replace("-", "_").replace(":", "_")
-
-
-def stable_dumps(data: dict) -> str:
-    """生成稳定的序列化字符串"""
-    return orjson.dumps(data, sort_keys=True, ensure_ascii=False)

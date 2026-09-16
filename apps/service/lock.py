@@ -17,7 +17,7 @@ from asyncmy import IntegrityError
 from vorm import Session
 
 from apps.model.common import DistributedLock
-from common.db import get_engine
+from common.db import get_engine, get_asynccontext_session
 
 _TABLE = DistributedLock.table_name()
 
@@ -31,23 +31,24 @@ def _spawn(coro: Coroutine[Any, Any, Any]) -> None:
     task.add_done_callback(_background_tasks.discard)
 
 
-async def acquire_lock(session: Session, lock_key: str, owner: str, ttl: int = 30) -> int | None:
+async def acquire_lock(lock_key: str, owner: str, ttl: int = 30) -> int | None:
     """尝试获取分布式锁，成功返回锁的自增主键 id，失败（已被占用）返回 None。
 
     靠 lock_key 唯一约束保证互斥：INSERT 成功即抢到锁，主键冲突（IntegrityError）即失败。
     """
-    lock = DistributedLock(
-        lock_key=lock_key,
-        owner=owner,
-        expire_at=datetime.datetime.now() + datetime.timedelta(seconds=ttl),
-    )
-    try:
-        await session.save(lock)
-    except IntegrityError:
-        return None
-    # 抢到锁后启动后台任务：到期自动删除该锁（过期自动释放）
-    _spawn(_auto_release_after(lock.id, ttl))
-    return lock.id
+    async with get_asynccontext_session() as session:
+        lock = DistributedLock(
+            lock_key=lock_key,
+            owner=owner,
+            expire_at=datetime.datetime.now() + datetime.timedelta(seconds=ttl),
+        )
+        try:
+            await session.save(lock)
+        except IntegrityError:
+            return None
+        # 抢到锁后启动后台任务：到期自动删除该锁（过期自动释放）
+        _spawn(_auto_release_after(lock.id, ttl))
+        return lock.id
 
 
 async def _auto_release_after(lock_id: int, ttl: int) -> None:
@@ -56,12 +57,8 @@ async def _auto_release_after(lock_id: int, ttl: int) -> None:
     用独立会话执行删除（请求级 session 早已关闭）；若锁已被主动释放，按 id 删除只是空操作。
     """
     await asyncio.sleep(ttl)
-    engine = await get_engine()
-    session = engine.session()
-    try:
+    async with get_asynccontext_session() as session:
         await session.execute_raw(f"DELETE FROM {_TABLE} WHERE id = %s", [lock_id])
-    finally:
-        await session.close()
 
 
 async def release_lock(session: Session, lock_key: str, owner: str) -> bool:
