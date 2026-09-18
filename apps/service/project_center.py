@@ -90,6 +90,15 @@ async def list_repositories(session: Session, page: int = 1, page_size: int = 20
     return {"totals": totals, "data": data}
 
 
+async def count_repositories(session: Session) -> int:
+    """获取代码组仓库总数（来自云效响应头 x-total），token 未配置时返回 0。"""
+    token = await _get_ali_yunxiao_token(session)
+    if not token:
+        return 0
+    response = await ali_yunxiao.get_group_repositories(token, page=1, perpage=1)
+    return int(response.headers.get("x-total") or 0)
+
+
 async def _project_like_stats(session: Session, project_ids: list[int], user_id: int | None) -> tuple[dict[int, int], set[int]]:
     """一次查询批量统计每个项目的点赞数与当前用户是否已赞。"""
     if not project_ids:

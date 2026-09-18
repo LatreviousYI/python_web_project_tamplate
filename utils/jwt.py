@@ -76,7 +76,7 @@ def decode_token_get_info(
     return decoded_payload
 
 
-def verify_token(token_info: dict = Depends(decode_token_get_info)) -> int:
+def verify_token(token_info: dict = Depends(decode_token_get_info)) -> int | None:
     """鉴权依赖：返回当前用户主键 id（int）。"""
     return token_info.get("user_id")
 

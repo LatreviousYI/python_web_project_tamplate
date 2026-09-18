@@ -2,7 +2,7 @@
 
 > 基础路径：`/api/v1`
 > 协议：HTTP/HTTPS · 数据格式：JSON（UTF-8）
-> 更新日期：2026-09-16
+> 更新日期：2026-09-18
 
 ## 目录
 
@@ -15,6 +15,7 @@
 - [7. 通用模块 /common](#7-通用模块-common)
 - [8. 项目中心模块 /projects](#8-项目中心模块-projects)
 - [9. 通知模块 /notifications](#9-通知模块-notifications)
+- [10. 技术月报模块 /reports](#10-技术月报模块-reports)
 
 ---
 
@@ -1216,3 +1217,195 @@ Authorization: Bearer <token>
 ```
 
 > 接口是幂等的：没有已读通知时也返回成功；只影响当前用户的已读通知，删除后不可恢复。
+
+---
+
+## 10. 技术月报模块 /reports
+
+> 技术月报为**统计接口，全部需鉴权**（Bearer Token），用于首页 / 月报页展示。统一口径：
+> - 「当月 / 本月」= `created_at ∈ [本月 1 日 00:00:00, 下月 1 日 00:00:00)`（本地时间）。
+> - 仅统计已发布内容（`status = "published"`），草稿 / 待审核不进入公开月报。
+> - 热门榜单取前 3（文章按 `like_count`、讨论按 `reply_count`、项目按当月点赞记录聚合）。
+> - 项目数量调云效接口取真实总数（响应头 `x-total`），项目本身不落库。
+
+### 10.1 当月统计
+
+> 返回当月技术文章数、问答数、项目总数。
+
+- **请求**
+
+```http
+GET /api/v1/reports/summary
+Authorization: Bearer <token>
+```
+
+- **成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "article_count": 12,
+    "qa_count": 5,
+    "project_count": 87
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| article_count | int | 当月已发布技术文章数 |
+| qa_count | int | 当月已发布问答数 |
+| project_count | int | 项目总数（云效 `x-total`，非当月口径） |
+
+### 10.2 热门文章
+
+> 当月点赞数前 3 的文章，返回完整 Post 对象并附加作者摘要 `user`。
+
+- **请求**
+
+```http
+GET /api/v1/reports/hot-articles
+Authorization: Bearer <token>
+```
+
+- **成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 10,
+      "user_id": 1,
+      "project_id": null,
+      "type": "article",
+      "title": "FastAPI 项目实践",
+      "summary": "本文介绍 FastAPI 项目搭建",
+      "content": "……",
+      "status": "published",
+      "tags": ["Python", "FastAPI"],
+      "view_count": 230,
+      "like_count": 15,
+      "reply_count": 3,
+      "published_at": "2026-09-05 10:00:00",
+      "created_at": "2026-09-05 09:58:00",
+      "updated_at": "2026-09-06 11:00:00",
+      "user": {
+        "id": 1,
+        "user_name": "zhangsan",
+        "name": "张三",
+        "avatar": null
+      }
+    }
+  ]
+}
+```
+
+> 数组按 `like_count` 降序，最多 3 条；字段结构与 `GET /posts` 列表项一致，额外多一个 `user` 作者摘要。
+
+### 10.3 热门讨论
+
+> 当月回复数前 3 的问答（`type = "qa"`），按 `reply_count` 降序，结构与 10.2 相同（附 `user` 摘要）。
+
+- **请求**
+
+```http
+GET /api/v1/reports/hot-discussions
+Authorization: Bearer <token>
+```
+
+- **成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 21,
+      "user_id": 3,
+      "type": "qa",
+      "title": "vorm 多表联查怎么做？",
+      "summary": "……",
+      "content": "……",
+      "status": "published",
+      "tags": ["vorm", "MySQL"],
+      "view_count": 80,
+      "like_count": 6,
+      "reply_count": 12,
+      "published_at": "2026-09-03 14:00:00",
+      "created_at": "2026-09-03 13:50:00",
+      "updated_at": "2026-09-08 09:00:00",
+      "user": {
+        "id": 3,
+        "user_name": "lisi",
+        "name": "李四",
+        "avatar": null
+      }
+    }
+  ]
+}
+```
+
+### 10.4 热门项目
+
+> 当月点赞数前 3 的项目。按 `osc_project_like` 当月记录 `GROUP BY project_id` 聚合，仅返回 `project_id` 与点赞数，**不含项目名**（前端可用 `GET /projects/{id}` 取名称）。
+
+- **请求**
+
+```http
+GET /api/v1/reports/hot-projects
+Authorization: Bearer <token>
+```
+
+- **成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    { "project_id": 4282444, "like_count": 5 },
+    { "project_id": 6907703, "like_count": 3 },
+    { "project_id": 5940858, "like_count": 2 }
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| project_id | int | 云效仓库 ID |
+| like_count | int | 当月点赞数 |
+
+### 10.5 趋势话题
+
+> 当月已发布文章的标签按出现次数降序统计（无 limit，返回全部标签）。
+
+- **请求**
+
+```http
+GET /api/v1/reports/trending-topics
+Authorization: Bearer <token>
+```
+
+- **成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    { "tag": "Python", "count": 8 },
+    { "tag": "FastAPI", "count": 5 },
+    { "tag": "MySQL", "count": 4 }
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| tag | string | 标签名 |
+| count | int | 当月出现次数（降序） |
