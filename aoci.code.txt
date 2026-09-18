@@ -1,0 +1,80 @@
+#AOCI-CODE-VOLUME: 1
+
+===D:/workspace/python/open_source_community/===
+.gitattributes[FC3T]: F:统一仓库文本文件换行为LF,保证跨平台字节一致检出 | R:- | A:- | S:改行尾会影响AOCI source_sha256字节绑定,导致候选失配
+.gitignore[FC4S]: F:定义git忽略规则,排除Python运行时/虚拟环境/密钥及机器绑定的.mcp.json | R:- | A:- | S:不得加入aoci认知资产(aoci.txt/aoci.meta.txt/aoci.code.txt/AGENTS.md),否则scan静默跳过致索引建不起来
+AGENTS.md[SG5S]: F:声明AOCI使用契约,界定aoci:begin/aoci:end块内机器托管内容 | R:- | A:- | S:该块由init写入勿手工编辑;不得加入.gitignore
+README.md[SG4T]: F:项目说明与本地运维注意事项 | R:- | A:- | S:osc_kv表key=ali_yunxiao_token存cipher.encrypt(明文),令牌过期需更新该行
+api_docs.md[SG7L]: F:全量REST API文档,覆盖鉴权/内容/回复/通知/项目/月报,约定统一响应与分页 | R:code:apps/router/auth.py,code:apps/router/post.py,code:apps/router/reply.py,code:apps/router/notification.py,code:apps/router/project_center.py,code:apps/router/common.py | A:记录/api/v1各接口路径/鉴权/参数/响应契约 | S:/reports需鉴权;资源不存在返回业务code=404而非HTTP404;published由系统审核置入用户仅可控draft/pending
+nb_log_config.py[FO5S]: F:nb_log 日志包根目录配置/覆盖默认日志路径/切割/模板/告警参数 | R:code:utils/log_util.py | A:定义 LOG_PATH/FORMATTER_DICT/FORMATTER_KIND/LOG_FILE_HANDLER_TYPE 等全局配置;get_host_ip() 取本机IP;JsonFormatterJumpAble 追加跳转字段 | S:含硬编码钉钉 token/邮箱密码/ES/Kafka/Mongo 等敏感凭据占位
+pyproject.toml[FV6T]: F:uv 项目清单/声明依赖与 pyright/ruff 工具配置 | R:code:uv.lock | A:dependencies 列 fastapi/nb-log/vorm/oss2/httpx 等;tool.pyright/tool.ruff 规则配置 | S:requires-python>=3.10
+start.py[EV5T]: F:uvicorn 启动入口/监听 0.0.0.0:8779 | R:code:factory/main.py | A:uvicorn.run("factory.main:app") 单进程启动 | S:workers=1 单 worker 启动
+uv.lock[FV5L]: F:uv 依赖锁定文件(全量包版本与哈希) | R:code:pyproject.toml | A:锁定 aiofiles/fastapi/vorm/httpx 等全部传递依赖版本与 wheel 哈希 | S:镜像源 mirrors.huaweicloud.com/pypi
+
+===D:/workspace/python/open_source_community/apps/===
+dependencies.py[EI7T]: F:提供鉴权依赖,从Authorization Bearer JWT解析user_id | R:- | A:get_current_user(→int user_id),get_optional_user,get_current_token_info三个Depends | S:SSO-ready的JWT占位实现,非法token抛HTTP 401;get_optional_user允许未登录返回None
+
+===D:/workspace/python/open_source_community/apps/model/===
+auth.py[PI7T]: F:定义SSO用户表osc_user的User模型 | R:code:apps/model/base_field.py | A:User字段:user_id(唯一str),user_name/name/mobile/email/tenant/avatar | S:user_id存fastgo accountCode非主键;对外仅暴露{id,user_name,name,avatar}摘要
+base_field.py[CD8T]: F:所有模型的公共基类,提供自增主键id与created_at/updated_at时间戳行为 | R:- | A:BaseField(Model),id/created_at/updated_at字段与序列化 | S:datetime序列化为YYYY-MM-DD HH:MM:SS;updated_at带索引且更新时自动刷新;全库naive本地时间
+common.py[PD5T]: F:通用存储模型:KeyValue键值(osc_kv)与DistributedLock分布式锁(osc_distributed_lock) | R:code:apps/model/base_field.py | A:KeyValue(key唯一,value JSON str,expire_at),DistributedLock(lock_key唯一,owner,expire_at) | S:osc_kv存敏感令牌如ali_yunxiao_token经cipher.encrypt
+notification.py[PM6T]: F:站内通知模型osc_notification,承载回复/审核通过/驳回三类通知 | R:code:apps/model/base_field.py | A:Notification字段:type(reply/approve/reject),recipient_id/actor_id/post_id/reply_id/content/is_read/read_at | S:点赞不产生通知;系统审核通知actor_id为null;自己回复自己不产生通知
+post.py[DB8T]: F:统一文章/问答Post模型(type区分)与PostLike点赞记录,冗余计数列 | R:code:apps/model/base_field.py | A:Post字段+incr_count原子增减(白名单view/like/reply);PostLike(post_id+user_id唯一) | S:like_count/reply_count/view_count为冗余列供排序;status为draft/pending/published;project_id无外键逻辑关联云效仓库
+project_center.py[PD5T]: F:云效成员YunxiaoUser(osc_yunxiao_user)与项目点赞ProjectLike(osc_project_like) | R:code:apps/model/base_field.py | A:ProjectLike(project_id+user_id唯一);YunxiaoUser存云效成员 | S:项目本身不落库仅点赞记录本地;project_id为云效仓库id无外键
+reply.py[PB7T]: F:两级回复Reply模型与ReplyVote点赞/点踩记录 | R:code:apps/model/base_field.py | A:Reply字段+incr_count(like/dislike);ReplyVote(reply_id+user_id唯一,vote_type like/dislike) | S:软删(is_deleted);reply_to指向根一级回复;reply_to_user_id记录具体被回复者;扁平两级模型
+
+===D:/workspace/python/open_source_community/apps/router/===
+auth.py[EI7T]: F:SSO鉴权路由:登录地址/ticket换JWT/退出注销 | R:code:apps/dependencies.py,code:apps/service/auth.py,code:utils/fast_go.py | A:GET /auth/login-url,POST /auth/login,POST /auth/logout | S:login-url与login无鉴权;logout需get_current_token_info取fast_token注销SSO会话
+common.py[EG5T]: F:通用文件上传与访问:上传OSS返回URL,按file_key生成签名地址302跳转 | R:code:apps/service/common.py,code:utils/oss.py,code:apps/dependencies.py | A:POST /common/upload/file,GET /common/get/file | S:上传需鉴权;下载签名URL有效期2小时;file_key含目录前缀open_source_community/
+home.py[EU1T]: F:首页占位路由 | R:- | A:GET /home/message | S:占位实现返回ok,函数名ge()
+notification.py[EM6T]: F:通知路由:列表/未读数/单条与全部已读/删除单条与全部已读 | R:code:apps/dependencies.py,code:apps/service/notification.py | A:GET /notifications,GET /notifications/unread-count,POST /notifications/{id}/read,POST /notifications/read-all,DELETE /notifications/{id},DELETE /notifications/read-all | S:全部需get_current_user;不存在或非本人通知返回业务code=404
+post.py[EB8S]: F:内容路由:文章/问答列表详情增删改/状态流转/点赞 | R:code:apps/dependencies.py,code:apps/service/post.py,code:apps/model/post.py | A:GET/POST /posts,GET /posts/mine,GET/PUT/DELETE /posts/{id},PATCH /posts/{id}/status,POST /posts/{id}/publish,POST /posts/{id}/like | S:公开列表仅published;详情view_count+1;PATCH状态仅draft/pending,published系统置入
+project_center.py[EB6T]: F:项目中心路由:云效仓库列表/详情透传+创作者匹配,项目点赞 | R:code:apps/dependencies.py,code:apps/service/project_center.py | A:GET /projects,GET /projects/{project_id},POST /projects/{project_id}/like | S:项目数据实时透传云效不落库;列表总数取响应头x-total;点赞切换式
+reply.py[EB7S]: F:回复路由:一二级回复列表/发表/删除/点赞点踩 | R:code:apps/dependencies.py,code:apps/service/reply.py | A:GET /posts/{post_id}/replies,GET /replies/{reply_id}/replies,POST /posts/{post_id}/replies,DELETE /replies/{reply_id},POST /replies/{reply_id}/vote | S:列表可选鉴权返回liked/disliked;vote切换且like/dislike互斥;删除为软删
+report.py[EA6T]: F:技术月报路由,5个统计接口(当月统计/热门文章/热门讨论/热门项目/趋势话题) | R:code:apps/dependencies.py,code:apps/service/report.py | A:GET /reports/summary,GET /reports/hot-articles,GET /reports/hot-discussions,GET /reports/hot-projects,GET /reports/trending-topics | S:全部接口需get_current_user鉴权
+
+===D:/workspace/python/open_source_community/apps/service/===
+auth.py[DI7T]: F:fastgo SSO登录:ticket换用户信息,按accountCode关联本地User(find-or-create),签发本地JWT | R:code:apps/model/auth.py,code:utils/fast_go.py,code:utils/jwt.py | A:fastgo_login(session,ticket)->dict,fastgo_logout(fast_token) | S:老用户登录以SSO为准回填name;JWT payload含user_id与fast_token
+common.py[IG4T]: F:文件上传:读取字节,重命名为短uuid+原后缀,存OSS返回file_key | R:code:utils/oss.py | A:knowledge_upload_file_with_bytes_get_file_key(file,folder,is_rename) | S:默认目录open_source_community;is_rename=True用uuid首段重命名
+lock.py[MR6T]: F:基于osc_distributed_lock表的分布式锁:INSERT抢锁,到期后台释放,owner匹配解锁 | R:code:apps/model/common.py,code:common/db.py | A:acquire_lock(lock_key/owner/ttl),release_lock(session/lock_key/owner),cleanup_expired_locks() | S:靠lock_key唯一约束互斥;后台任务引用存_set避免被GC回收;cleanup_expired_locks用于进程重启兜底
+notification.py[DM6S]: F:通知业务:写入/分页列表(附触发者与帖子标题)/单条与全部已读/删除/未读数 | R:code:apps/model/notification.py,code:apps/model/auth.py,code:apps/model/post.py | A:create_notification,list_notifications,mark_read,mark_all_read,delete_notification/delete_all_read,unread_count | S:写入best-effort由调用方try/except;actor==recipient不产生通知
+post.py[DB8M]: F:内容业务:文章/问答查询增删改、状态流转(draft/pending/published)、点赞切换、自动审核 | R:code:apps/model/post.py,code:apps/model/auth.py,code:apps/service/notification.py,code:utils/betteryeah_utils.py | A:list_posts/list_my_posts,create/update/delete_post,get_post(详情view_count+1),set_post_status/publish_post/reject_post,review_pending_posts,like_post | S:published仅系统审核置入,用户仅可控draft/pending;审核调用verfiy_content失败跳过保持pending
+project_center.py[IB6S]: F:项目中心业务:同步云效成员、仓库列表/详情透传(补creator_name/like_count/liked)、项目点赞 | R:code:apps/model/project_center.py,code:apps/model/common.py,code:utils/ali_yunxiao.py,code:utils/cipher_util.py | A:sync_yunxiao_users,list_repositories,count_repositories,get_repository_detail,like_project | S:仓库不落库实时透传,总数取响应头x-total;云效token存osc_kv经cipher加密
+reply.py[DB7M]: F:回复业务:一二级回复列表/发表/软删/点赞点踩切换,target_type由Post.type派生冗余 | R:code:apps/model/reply.py,code:apps/model/post.py,code:apps/service/notification.py | A:list_first_level_replies,list_sub_replies,create_reply,delete_reply,vote_reply | S:二级回复reply_to归一化到根一级回复;回复通知best-effort;vote切换且like/dislike互斥
+report.py[DA6S]: F:技术月报业务:当月统计/热门文章/热门讨论/热门项目/趋势话题聚合查询 | R:code:apps/model/post.py,code:apps/model/project_center.py,code:apps/service/project_center.py | A:summary,hot_articles,hot_discussions,hot_projects,trending_topics | S:当月=created_at∈[本月1日,下月1日);仅统计published;热门项目按osc_project_like当月GROUP BY聚合
+
+===D:/workspace/python/open_source_community/apps/tasks/===
+__init__.py[OW5T]: F:注册定时与常驻后台任务:APScheduler cron同步云效用户 + asyncio常驻内容审核循环 | R:code:apps/tasks/content_review.py,code:apps/tasks/yunxiao_user.py,code:utils/async_task.py | A:start_scheduler()->AsyncIOScheduler,start_forerver_loop() | S:云效用户每天0点同步;start_forerver_loop用create_task_with_safe规避弱引用回收
+content_review.py[OW6T]: F:内容审核常驻循环:持续处理pending内容,空闲休眠,分布式锁保证单实例 | R:code:apps/service/post.py,code:apps/service/lock.py,code:common/db.py,code:configs/__init__.py | A:review_pending_posts_loop() | S:每批最多50条;空闲休眠10秒;锁key=review_pending_posts;shutdown_stauts==1时退出
+yunxiao_user.py[OW5T]: F:云效用户同步定时任务入口:独立会话拉取并落库云效成员 | R:code:apps/service/project_center.py,code:apps/service/lock.py,code:common/db.py | A:sync_yunxiao_user_job() | S:锁key=sync_yunxiao_user_job;同步失败仅记日志不抛出
+
+===D:/workspace/python/open_source_community/common/===
+db.py[RD8T]: F:数据库引擎与会话管理:惰性创建复用MySQL连接池,提供请求级与上下文会话 | R:code:configs/__init__.py,code:utils/cipher_util.py | A:get_engine(),get_session(),get_asynccontext_session() | S:db_pass经cipher解密;get_session为FastAPI依赖请求结束自动关闭;当前阶段不连库
+
+===D:/workspace/python/open_source_community/configs/===
+__init__.py[FC6T]: F:按APP_ENV加载环境配置(dev/test/uat/prod),注入SEC_KEY,缓存为全局settings | R:code:configs/base_conf.py,code:configs/dev_conf.py,code:configs/prod_conf.py,code:configs/uat_conf.py,code:configs/test_conf.py | A:settings(全局实例),get_settings() | S:默认APP_ENV=prod;依赖环境变量SEC_KEY;get_settings用lru_cache缓存
+base_conf.py[FC7T]: F:配置基类:JWT/OSS/云效/审核服务等公共配置与密钥 | R:- | A:BaseSettings(sec_key/app_name/jwt_*/oss_*/ali_yunxiao/better_yeah_url/access_key/workspace_id) | S:jwt_secret_key明文硬编码;db_pass与oss密钥经cipher加密;background_tasks_shutdown_stauts=1表示关闭
+dev_conf.py[FC5T]: F:开发环境配置:dev库连接、fastgo单点地址、本机服务地址 | R:code:configs/base_conf.py | A:DevSettings(env,db_*,fast_go_*,mine_server) | S:db_pass为cipher加密密文;db_port=3206;fastgo地址为test环境TODO待填
+prod_conf.py[FC5T]: F:生产环境配置:prod库连接(RDS)、fastgo单点、服务地址 | R:code:configs/base_conf.py | A:ProdSettings(env,db_*,fast_go_*,mine_server) | S:db_pass为cipher加密密文;db_host为阿里云RDS地址
+uat_conf.py[FC5T]: F:UAT环境配置:与prod同库连接、fastgo单点、服务地址 | R:code:configs/base_conf.py | A:UatSettings(env,db_*,fast_go_*,mine_server) | S:db连接与prod一致;db_pass为cipher加密密文
+
+===D:/workspace/python/open_source_community/factory/===
+main.py[AG8T]: F:应用装配:创建FastAPI实例、注册全部路由与CORS、lifespan启动建表/清锁/调度器/审核循环 | R:code:factory/middleware.py,code:factory/sync_db.py,code:common/db.py,code:apps/tasks/__init__.py,code:apps/service/lock.py,code:utils/httpx_utils.py | A:create_app()->FastAPI,register_routers(app),app(全局实例) | S:路由统一挂/api/v1前缀;docs_url/redoc_url关闭;lifespan顺序get_engine→sync_db→cleanup_expired_locks→start_scheduler→start_forerver_loop
+middleware.py[MG6T]: F:全局异常处理:HTTPException/参数校验/未捕获异常统一为ApiResponse响应 | R:code:utils/response_utils.py,code:utils/log_util.py | A:register_error_handlers(app) | S:参数校验错误返回HTTP 422;orjson JSONDecodeError返回400;其余未捕获异常返回500
+sync_db.py[PD4T]: F:应用启动对全部 ORM 模型执行 sync_table 建表(分布式锁防并发) | R:code:factory/main.py,code:common/db.py,code:apps/service/lock.py | A:sync_db(): 加锁后遍历 db_list 调 model.sync_table(session.dialect) | S:覆盖 User/Post/Reply/ReplyVote/PostLike/Notification/YunxiaoUser/ProjectLike/KeyValue/DistributedLock 十张表
+
+===D:/workspace/python/open_source_community/utils/===
+ali_yunxiao.py[IN6S]: F:云效开放平台 API 客户端/代码组仓库与成员查询 | R:code:utils/httpx_utils.py,code:utils/log_util.py,code:utils/response_utils.py,code:apps/service/project_center.py | A:get_group_repositories(token/page/perpage) 拉仓库列表;get_group_repositories_detail(token/repositories_id) 拉详情;get_ali_yunxiao_user(token/page/perpage) 拉成员 | S:三接口读 x-yunxiao-token 头/失败记日志并抛500
+async_task.py[CW5T]: F:异步任务管理/安全创建/关闭等待/限流队列 | R:code:apps/tasks/__init__.py,code:factory/main.py,code:configs/__init__.py | A:create_task_with_safe(coro) 建任务并注册回调;shutdown_forever_task() 等待清空;TaskQueue 带上限协程队列 | S:用 settings.background_tasks 全局 set 管理任务生命周期
+betteryeah_utils.py[IA6S]: F:BetterYeah 工作流平台客户端/执行流/内容校验/结果解析 | R:code:apps/service/post.py,code:utils/cipher_util.py,code:utils/httpx_utils.py,code:utils/tools.py | A:process_json_data(data/result_type) 格式转换;execute_flow(flow_id/data) 调工作流;verfiy_content(content) 内容审核 | S:access_key 密文经 cipher.decrypt 解密后作 Access-key 头
+calculate.py[KG4T]: F:除法与环比计算工具(分母为0安全) | R:code:apps/service/report.py | A:division(numerator/denominator) 除零返回0;calculate_ring_ratio(current_num/last_period_num/zero_result) 环比 | S:上期为0本期有值时默认返回1(100%增长)
+cipher_util.py[KS7T]: F:AES-ECB 加解密工具(pycryptodome)/全局 cipher 实例 | R:code:common/db.py,code:utils/oss.py,code:utils/betteryeah_utils.py,code:apps/service/project_center.py | A:AESCipher.encrypt(data)/decrypt(data) ECB模式PKCS7填充;__main__ 生成密钥自测 | S:sec_key 取自 settings.sec_key(32字节十六进制)
+excel_util.py[CG4T]: F:CSV 流导出工具(utf-8-sig 编码/日期格式化) | R:- | A:write_stream(datas/header) 用 csv.writer 生成 BytesIO | S:datetime/date 字段格式化后写入
+fast_go.py[II7S]: F:FastGo 单点登录(SSO)集成/ticket 校验/登录跳转/租户切换 | R:code:apps/router/auth.py,code:apps/service/auth.py,code:utils/tools.py,code:utils/httpx_utils.py | A:get_login_url/local_url 拼登录地址;get_sign_by_ticket_url(ticket) 拼签名URL;do_fastgo_check_ticket(ticket) 校验ticket;login_out(fast_token) 登出;get_tenant_list/switch_tenant 租户 | S:用 client+nonce+ticket+timestamp+key 拼串做 MD5 签名
+httpx_utils.py[CN5T]: F:全局 httpx 异步客户端(连接池/超时/关闭) | R:code:factory/main.py,code:utils/ali_yunxiao.py,code:utils/betteryeah_utils.py,code:utils/fast_go.py | A:httpx_client 连接池10/并发20;close_httpx() 关闭客户端 | S:read 超时120s
+jwt.py[CI7S]: F:JWT 生成/校验与 FastAPI 鉴权依赖(SSO-ready 占位) | R:code:apps/dependencies.py,code:configs/base_conf.py,code:utils/response_utils.py | A:generate_token(data/expiration_delta) 生成token;decode_token_get_info 解析校验;verify_token/verify_token_optional 鉴权依赖;HTTPBearerRaise401 解析Bearer | S:密钥/算法取自 settings.jwt_secret_key/jwt_algorithm
+log_util.py[CO5T]: F:nb_log 统一日志初始化(uvicorn/osc/apscheduler/httpx 命名空间) | R:code:nb_log_config.py,code:configs/__init__.py | A:插入 basedir 到 sys.path[1];get_logger 创建各模块日志器;logger=osc 主日志器 | S:dev 环境降低 apscheduler/httpx 日志级别
+oss.py[ID6S]: F:阿里云 OSS 客户端/上传/签名URL/异步封装/key 解析 | R:code:utils/cipher_util.py,code:apps/router/common.py,code:apps/service/common.py | A:create_bucket() 懒建bucket;upload_file_to_oss(bucket/oss_name/local_file_path) 上传并签URL;get_key(oss_url_or_key) 解析key;多组 _async 线程池封装 | S:认证密钥经 cipher.decrypt 解密
+request_utils.py[CU4T]: F:请求体解析依赖 GetPostJsonBody | R:code:utils/response_utils.py,code:utils/log_util.py | A:GetPostJsonBody.__call__(request) 解析JSON/失败抛400 | S:捕获 ClientDisconnect 记日志
+response_utils.py[CG7T]: F:统一响应模型 ApiResponse/PageResult 与异常辅助 | R:code:apps/dependencies.py,code:utils/jwt.py,code:apps/router/report.py,code:factory/middleware.py | A:ApiResponse{code/message/data};PageResult{totals/data};server_error/invalid_token/invalid_permission 抛HTTPException | S:统一结构 {code/message/data}
+tools.py[CG6L]: F:通用工具函数集合(时间/JSON/随机串/字典/校验/重试) | R:code:utils/log_util.py,code:utils/betteryeah_utils.py,code:utils/fast_go.py | A:时间 datetime_to_string/parse_datetime/local_datetime_to_utc_str;JSON dict_to_json/json_to_dict/JsonExtendResponse;随机 generate_random_str/generate_uuid;校验 validate_input/sanitize_for_db;重试 async_retry_on_error | S:orjson 自定义序列化回调处理 datetime/date/Decimal/bytes
