@@ -23,7 +23,7 @@ def register_error_handlers(app: FastAPI) -> None:
         log_util.logger.exception(exc)
         detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
         return JSONResponse(
-            status_code=exc.status_code,
+            status_code=200,
             content=response_utils.ApiResponse(code=exc.status_code, message=detail).model_dump(mode="json"),
         )
 
@@ -39,7 +39,7 @@ def register_error_handlers(app: FastAPI) -> None:
         else:
             message = "参数校验失败"
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=200,
             content=response_utils.ApiResponse(code=status.HTTP_422_UNPROCESSABLE_ENTITY, message=message, data=errors).model_dump(mode="json"),
         )
 
@@ -50,12 +50,12 @@ def register_error_handlers(app: FastAPI) -> None:
         """
         if isinstance(exc, orjson.JSONDecodeError):
             return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=200,
                 content=response_utils.ApiResponse(code=status.HTTP_400_BAD_REQUEST, message="参数异常,可能不是json格式").model_dump(mode="json"),
             )
 
         log_util.logger.exception(exc)
         return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=200,
             content=response_utils.ApiResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Internal Server Error").model_dump(mode="json"),
         )
