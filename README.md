@@ -5,3 +5,10 @@ https://account-devops.aliyun.com/settings/personalAccessToken
 表名 osc_kv
 key=ali_yunxiao_token
 value = utils\cipher_util.py.cipher.encrypt(明文)
+
+
+
+```bash
+导出包列表到requirements.txt
+uv pip compile --emit-index-url --universal pyproject.toml -o requirements.txt
+```
