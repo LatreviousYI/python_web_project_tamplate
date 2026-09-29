@@ -10,7 +10,7 @@ import sys
 from configs import settings
 
 # 创建日志目录
-log_dir = settings.basedir.joinpath(f"logs/{settings.app_name}")
+log_dir = settings.basedir.joinpath(f"logs")
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # 将项目路径插入到sys.path[1]的位置,这样nb_log就能读取当前项目下的nb_log_config.py文件
