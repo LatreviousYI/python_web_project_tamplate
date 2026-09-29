@@ -1,6 +1,6 @@
 # 开源社区 API 文档
 
-> 基础路径：`/api/v1`
+> 基础路径：`/osc/api/v1`
 > 协议：HTTP/HTTPS · 数据格式：JSON（UTF-8）
 > 更新日期：2026-09-18
 
@@ -29,7 +29,7 @@
 Authorization: Bearer <token>
 ```
 
-- Token 由 [`POST /api/v1/auth/login`](#post-authlogin) 用 SSO 票据换取，返回 `token` 字段。
+- Token 由 [`POST /osc/api/v1/auth/login`](#post-authlogin) 用 SSO 票据换取，返回 `token` 字段。
 - JWT payload 中的 `user_id` 为本地用户表主键 `osc_user.id`（int），路由依赖 `get_current_user` 即解出该 id。
 - 未携带或非法 token 时，鉴权依赖会抛出 HTTP `401`。
 
@@ -784,7 +784,7 @@ SSO 用户。
 
 - 服务端读取文件字节，重命名为 `{短uuid}{原后缀}`（例如 `e1f2a3b4.png`）。
 - 存储到 OSS 的 `open_source_community/` 目录下，得到 `file_key`。
-- 返回的 `data` 为文件访问 URL：`{mine_server}/api/v1/common/get/file?file_key={file_key}`。
+- 返回的 `data` 为文件访问 URL：`{mine_server}/osc/api/v1/common/get/file?file_key={file_key}`。
 
 **响应示例**
 
@@ -792,7 +792,7 @@ SSO 用户。
 {
   "code": 200,
   "message": "success",
-  "data": "https://example.com/api/v1/common/get/file?file_key=open_source_community/e1f2a3b4.png"
+  "data": "https://example.com/osc/api/v1/common/get/file?file_key=open_source_community/e1f2a3b4.png"
 }
 ```
 
@@ -1001,7 +1001,7 @@ SSO 用户。
 **请求示例**
 
 ```http
-GET /api/v1/notifications?page=1&page_size=20&unread=true
+GET /osc/api/v1/notifications?page=1&page_size=20&unread=true
 Authorization: Bearer <token>
 ```
 
@@ -1066,7 +1066,7 @@ Authorization: Bearer <token>
 **请求示例**
 
 ```http
-GET /api/v1/notifications/unread-count
+GET /osc/api/v1/notifications/unread-count
 Authorization: Bearer <token>
 ```
 
@@ -1098,7 +1098,7 @@ Authorization: Bearer <token>
 **请求示例**
 
 ```http
-POST /api/v1/notifications/101/read
+POST /osc/api/v1/notifications/101/read
 Authorization: Bearer <token>
 ```
 
@@ -1134,7 +1134,7 @@ Authorization: Bearer <token>
 **请求示例**
 
 ```http
-POST /api/v1/notifications/read-all
+POST /osc/api/v1/notifications/read-all
 Authorization: Bearer <token>
 ```
 
@@ -1166,7 +1166,7 @@ Authorization: Bearer <token>
 **请求示例**
 
 ```http
-DELETE /api/v1/notifications/101
+DELETE /osc/api/v1/notifications/101
 Authorization: Bearer <token>
 ```
 
@@ -1202,7 +1202,7 @@ Authorization: Bearer <token>
 **请求示例**
 
 ```http
-DELETE /api/v1/notifications/read-all
+DELETE /osc/api/v1/notifications/read-all
 Authorization: Bearer <token>
 ```
 
@@ -1235,7 +1235,7 @@ Authorization: Bearer <token>
 - **请求**
 
 ```http
-GET /api/v1/reports/summary
+GET /osc/api/v1/reports/summary
 Authorization: Bearer <token>
 ```
 
@@ -1266,7 +1266,7 @@ Authorization: Bearer <token>
 - **请求**
 
 ```http
-GET /api/v1/reports/hot-articles
+GET /osc/api/v1/reports/hot-articles
 Authorization: Bearer <token>
 ```
 
@@ -1313,7 +1313,7 @@ Authorization: Bearer <token>
 - **请求**
 
 ```http
-GET /api/v1/reports/hot-discussions
+GET /osc/api/v1/reports/hot-discussions
 Authorization: Bearer <token>
 ```
 
@@ -1357,7 +1357,7 @@ Authorization: Bearer <token>
 - **请求**
 
 ```http
-GET /api/v1/reports/hot-projects
+GET /osc/api/v1/reports/hot-projects
 Authorization: Bearer <token>
 ```
 
@@ -1387,7 +1387,7 @@ Authorization: Bearer <token>
 - **请求**
 
 ```http
-GET /api/v1/reports/trending-topics
+GET /osc/api/v1/reports/trending-topics
 Authorization: Bearer <token>
 ```
 
