@@ -15,7 +15,7 @@ from utils.async_task import shutdown_forever_task
 
 
 def register_routers(app: FastAPI):
-    api_router = APIRouter(prefix="/api/v1")
+    api_router = APIRouter(prefix="/osc/api/v1")
     api_router.include_router(home.router)
     api_router.include_router(auth.router)
     api_router.include_router(post.router)
