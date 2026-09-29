@@ -41,5 +41,5 @@ async def review_pending_posts_loop() -> None:
                 count = 0
             # 有任务就继续处理下一批，无任务才休眠
             if count == 0:
-                log_util.logger.debug("无待审核内容，休眠 %s 秒", _IDLE_SLEEP_SECONDS)
+                # log_util.logger.debug("无待审核内容，休眠 %s 秒", _IDLE_SLEEP_SECONDS)
                 await asyncio.sleep(_IDLE_SLEEP_SECONDS)
