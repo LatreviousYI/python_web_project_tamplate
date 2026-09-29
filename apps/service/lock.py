@@ -18,6 +18,7 @@ from vorm import Session
 
 from apps.model.common import DistributedLock
 from common.db import get_engine, get_asynccontext_session
+from utils import log_util
 
 _TABLE = DistributedLock.table_name()
 
@@ -45,6 +46,7 @@ async def acquire_lock(lock_key: str, owner: str, ttl: int = 30) -> int | None:
         try:
             await session.save(lock)
         except IntegrityError:
+            log_util.logger.debug("分布式锁 %s 已被占用，owner=%s", lock_key, owner)
             return None
         # 抢到锁后启动后台任务：到期自动删除该锁（过期自动释放）
         _spawn(_auto_release_after(lock.id, ttl))
