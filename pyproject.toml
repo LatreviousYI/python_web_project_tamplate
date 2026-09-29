@@ -17,8 +17,12 @@ dependencies = [
     "orjson>=3.9.0",
     "httpx>=0.28.1",
     "apscheduler[asyncio]>=3.11.3",
+    "gunicorn>=26.2.0",
 ]
 
+[[tool.uv.index]]
+url = "https://mirrors.huaweicloud.com/repository/pypi/simple"
+default = true
 
 [tool.pyright]
 venvPath = "."
