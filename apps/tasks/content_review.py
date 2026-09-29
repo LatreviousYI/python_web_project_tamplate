@@ -22,6 +22,7 @@ _LOCK_KEY = "review_pending_posts"
 
 async def review_pending_posts_loop() -> None:
     """常驻循环：持续审核待发布内容，空闲时休眠 60 秒。"""
+    log_util.logger.debug("内容审核常驻任务获取锁")
     if not await acquire_lock(_LOCK_KEY, "system", 60):
         return
     log_util.logger.debug("内容审核常驻任务启动")
