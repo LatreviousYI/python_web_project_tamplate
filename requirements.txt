@@ -84,6 +84,8 @@ fastar==0.12.0
     # via
     #   fastapi
     #   fastapi-cloud-cli
+gunicorn==26.2.0
+    # via open-source-community (pyproject.toml)
 h11==0.16.0
     # via
     #   httpcore
