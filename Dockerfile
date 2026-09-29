@@ -10,5 +10,5 @@ RUN echo "Asia/Shanghai" > /etc/timezone
 EXPOSE 8779
 
 # CMD ["gunicorn", "vrm:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:7666"]
-# CMD gunicorn -c gunicorn.conf.py;sleep infinity
-CMD gunicorn -c gunicorn.conf.py
+CMD gunicorn -c gunicorn.conf.py;sleep infinity
+# CMD gunicorn -c gunicorn.conf.py
