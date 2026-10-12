@@ -9,6 +9,7 @@ class BaseField(Model):
     created_at: datetime.datetime = Field(
         default_factory=datetime.datetime.now,
         timestamp_behavior="create",  # INSERT 时写入，UPDATE 时跳过
+        nullable=False,  # 模型必填，DB 侧同样禁止 NULL，避免脏数据导致读取校验失败
     )
     # MySQL → DATETIME,  PG → TIMESTAMP
 
@@ -16,6 +17,7 @@ class BaseField(Model):
         default_factory=datetime.datetime.now,
         timestamp_behavior="both",  # INSERT / UPDATE 都会刷新
         index=True,
+        nullable=False,  # 模型必填，DB 侧同样禁止 NULL
     )
 
     @field_serializer("created_at", "updated_at")

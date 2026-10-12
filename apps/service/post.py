@@ -11,6 +11,7 @@ from typing import Optional
 from vorm import Session, col
 
 from apps.model.auth import User
+from apps.model.notification import Notification
 from apps.model.post import Post, PostLike
 from apps.service import notification as notification_service
 from utils import betteryeah_utils, log_util
@@ -144,6 +145,9 @@ async def delete_post(session: Session, post_id: int, user_id: int) -> Post | No
     post = await session.query(Post).filter(Post.id == post_id, Post.user_id == user_id).first()
     if post is None:
         return None
+    # 内容被真正删除时，一并清理指向它的站内通知，避免留下点进去必然 404 的死链
+    for row in await session.query(Notification).filter(Notification.post_id == post_id).all():
+        await session.delete(row)
     # TODO: 关联回复的清理（软删 / 级联）待补
     await session.delete(post)
     return post

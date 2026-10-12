@@ -24,9 +24,6 @@ class BaseSettings:
     oss_endpoint = "https://oss-cn-shanghai.aliyuncs.com"
     oss_bucket_name = "ai-hrbp-prod"
 
-    ali_yunxiao = "https://openapi-rdc.aliyuncs.com"
-    ali_yunxiao_token = ""  # 云效 OpenAPI 访问令牌（x-yunxiao-token），TODO: 填写实际值
-
     better_yeah_url = "https://ai-api.betteryeah.com/v1"
 
     access_key = "/ogFPRpT+ELG8/4FnRzz6eYv0LWZud1rzBoV3wvrExSyJYk5H2u8cjFSYhHFSqRCSle77UzBJeJSoZ9d0Y/tHg=="

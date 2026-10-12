@@ -133,3 +133,5 @@ dev_scripts/*
 # AOCI agent host integration (machine-bound; do not commit)
 .mcp.json
 .mcp.json.backup.*
+.codex/config.toml
+.codex/config.toml.backup.*
