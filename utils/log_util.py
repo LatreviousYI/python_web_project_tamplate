@@ -26,5 +26,4 @@ logger = get_logger(name="osc", log_filename="osc.log")
 
 # 开发环境下降低第三方库的日志级别，避免日志噪音
 if settings.env == "dev":
-    get_logger(name="apscheduler.scheduler", log_level_int=logging.ERROR)
     get_logger(name="httpx", log_level_int=logging.ERROR)

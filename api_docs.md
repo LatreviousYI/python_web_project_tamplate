@@ -128,7 +128,7 @@ SSO 用户。
 | --- | --- | --- |
 | `id` | int | 主键，自增 |
 | `user_id` | int | 作者用户主键 id（`osc_user.id`） |
-| `project_id` | int \| null | 关联项目 id（项目中心云效仓库 id），可空 |
+| `project_id` | int \| null | 关联项目 id（`osc_project.id`），可空 |
 | `type` | string | 类型：`article` / `qa` |
 | `title` | string | 标题 |
 | `summary` | string \| null | 摘要 |
@@ -142,7 +142,7 @@ SSO 用户。
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
 
-> `project_id` 为逻辑关联（不建外键约束），指向项目中心（云效）的仓库 id；项目名称等元信息由 [`GET /projects`](#8-项目中心模块-projects) 提供，前端按 `project_id` 自行关联。
+> `project_id` 为逻辑关联（不建外键约束），指向项目中心项目 id（`osc_project.id`）；项目标题等元信息由 [`GET /projects`](#8-项目中心模块-projects) 提供，前端按 `project_id` 自行关联。
 
 ### 2.3 Reply（`osc_reply`）
 
@@ -181,17 +181,37 @@ SSO 用户。
 
 ### 2.5 ProjectLike（`osc_project_like`）
 
-项目点赞记录，用于判断「当前用户是否已点赞某个项目（云效仓库）」。
+项目点赞记录，用于判断「当前用户是否已点赞某个项目」。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | int | 主键，自增 |
-| `project_id` | int | 项目 id（云效仓库 id） |
+| `project_id` | int | 项目 id（`osc_project.id`） |
 | `user_id` | int | 点赞用户主键 id（`osc_user.id`） |
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
 
-> 项目本身不落库（实时透传云效），点赞记录存本地；点赞数 = 该 `project_id` 的记录条数。同一用户对同一项目最多一条记录（`project_id + user_id` 唯一）。
+> 项目元信息来自本地库 `osc_project`，点赞记录存本地；点赞数 = 该 `project_id` 的记录条数。同一用户对同一项目最多一条记录（`project_id + user_id` 唯一）。
+
+### 2.6 Project（`osc_project`）
+
+社区项目，本地落库。项目模块已与云效仓库解耦：创建项目不再跳转云效，仓库链接（`repo_url`）仅作为普通字符串保存，不与任何云效仓库绑定。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 主键，自增 |
+| `user_id` | int | 创建者用户主键 id（`osc_user.id`） |
+| `title` | string | 项目标题（`VARCHAR(200)`） |
+| `summary` | string \| null | 项目简介（Markdown 正文，`TEXT`，不限制长度） |
+| `tags` | array | 标签列表（JSON） |
+| `repo_url` | string \| null | 仓库链接（`VARCHAR(500)`，选填，不做可用性校验） |
+| `is_deleted` | bool | 是否已软删除（`1` = 已删除）。软删除的项目不再出现在列表 / 详情 / 月报统计中，但**数据保留** |
+| `created_at` | datetime | 创建时间 |
+| `updated_at` | datetime | 更新时间 |
+
+> `is_deleted` 是内部标记，不出现在接口响应里。项目删除采用软删除，不会级联删除项目下的文章 / 问答 / 回复 / 点赞 / 贡献者记录。
+>
+> `osc_project_contributor`（项目贡献者）结构为 `{ id, project_id, user_id, created_at, updated_at }`，`project_id + user_id` 唯一；写入前会校验 `user_id` 必须存在于 `osc_user`。
 
 ---
 
@@ -317,7 +337,7 @@ SSO 用户。
 | `page` | int | 1 | 页码，`>= 1` |
 | `page_size` | int | 20 | 每页条数，`1 ~ 100` |
 | `type` | string | — | 可选，按类型筛选：`article` / `qa` |
-| `project_id` | int | — | 可选，按项目筛选（云效仓库 id） |
+| `project_id` | int | — | 可选，按项目筛选（`osc_project.id`） |
 
 **响应示例**
 
@@ -401,7 +421,7 @@ SSO 用户。
 | `status` | string | 否 | 初始状态：`draft` / `pending`，默认 `draft` |
 | `summary` | string \| null | 否 | 摘要 |
 | `tags` | array | 否 | 标签列表，默认 `[]` |
-| `project_id` | int \| null | 否 | 关联项目 id（项目中心云效仓库 id），默认 `null` |
+| `project_id` | int \| null | 否 | 关联项目 id（`osc_project.id`），默认 `null` |
 
 **响应示例**
 
@@ -819,7 +839,7 @@ SSO 用户。
 
 ### GET /projects
 
-代码仓库（项目）列表，分页。数据直接透传阿里云效 `get_group_repositories` 的仓库对象，并额外匹配出 `creator_name`（创建者姓名，由 `creatorUid` 关联本地云效成员表 `osc_yunxiao_user` 得到，未匹配到时为 `null`）。
+项目列表（本地库 `osc_project`），按创建时间倒序分页，**不含已软删除的项目**。在项目基础字段之外追加 `creator_name`（创建者姓名，由 `user_id` 关联 `osc_user` 得到，未取到为 `null`）、`contributors`（贡献者列表，来自 `osc_project_contributor` 关联 `osc_user` 的最小信息）、`like_count`、`liked`、`can_edit`。
 
 | 鉴权 | 是（Bearer token） |
 | --- | --- |
@@ -830,6 +850,7 @@ SSO 用户。
 | --- | --- | --- | --- |
 | `page` | int | 1 | 页码，`>= 1` |
 | `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `mine` | bool | false | 为 `true` 时仅返回当前登录用户创建的项目（个人中心「我的项目」使用），`totals` 同步按该条件统计 |
 
 **响应示例**
 
@@ -841,19 +862,21 @@ SSO 用户。
     "totals": 12,
     "data": [
       {
-        "id": 4282444,
-        "name": "auto-recruit",
-        "nameWithNamespace": "5f278b52d248146039338d7b / ai / auto-recruit",
-        "path": "auto-recruit",
-        "httpUrlToRepo": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/auto-recruit.git",
-        "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/auto-recruit.git",
-        "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/auto-recruit",
-        "creatorUid": "64743b3968eb1baac2f20886",
+        "id": 1,
+        "user_id": 1001,
+        "title": "auto-recruit",
+        "summary": "自动化招聘助手",
+        "tags": ["Python", "FastAPI"],
+        "repo_url": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/auto-recruit",
+        "created_at": "2026-09-14 10:00:00",
+        "updated_at": "2026-09-14 10:00:00",
         "creator_name": "张三",
-        "visibility": "private",
-        "starCount": 0,
+        "contributors": [
+          { "id": 1002, "user_name": "lisi", "name": "李四", "avatar": null }
+        ],
         "like_count": 2,
-        "liked": true
+        "liked": true,
+        "can_edit": true
       }
     ]
   }
@@ -864,25 +887,111 @@ SSO 用户。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | int | 仓库 id |
-| `name` | string | 仓库名 |
-| `nameWithNamespace` | string | 带命名空间的全名 |
-| `path` | string | 仓库路径 |
-| `httpUrlToRepo` | string | HTTP 克隆地址 |
-| `sshUrlToRepo` | string | SSH 克隆地址 |
-| `webUrl` | string | 网页地址 |
-| `creatorUid` | string | 创建者 userId（对应云效成员 `userId`） |
-| `creator_name` | string \| null | 创建者姓名（本地匹配，未同步到则 `null`） |
-| `visibility` | string | 可见性（如 `private`） |
-| `starCount` | int | 收藏数 |
+| `id` | int | 项目 id（`osc_project.id`） |
+| `user_id` | int | 创建者用户主键 id（`osc_user.id`） |
+| `title` | string | 项目标题 |
+| `summary` | string \| null | 项目简介（Markdown 正文，数据库类型 `TEXT`） |
+| `tags` | string[] | 标签列表 |
+| `repo_url` | string \| null | 仓库链接（选填，可后期补充）。最长 500 字符；填写了必须是 `http(s)://` 开头且主机名含 `.` 的完整链接，留空表示未填写 |
+| `created_at` | string | 创建时间 `YYYY-MM-DD HH:MM:SS` |
+| `updated_at` | string | 更新时间 `YYYY-MM-DD HH:MM:SS` |
+| `creator_name` | string \| null | 创建者姓名（本地匹配，未取到为 `null`） |
+| `contributors` | object[] | 贡献者列表，每项为 `{ id, user_name, name, avatar }`，无贡献者为 `[]` |
 | `like_count` | int | 点赞数 |
 | `liked` | bool | 当前用户是否已点赞 |
+| `can_edit` | bool | 当前用户是否可编辑（仅创建者） |
 
-> 说明：`data` 中每条记录为云效仓库对象的原样透传（除追加 `creator_name`、`like_count`、`liked` 外不做裁剪），还包含 `accessLevel`、`archived`、`creatorId`、`demoProject`、`encrypted`、`namespaceId`、`repositorySize`、`repositoryTags`、`starred`、`createdAt`、`lastActivityAt`、`updatedAt` 等原始字段，前端按需取用。总数 `totals` 取自响应头 `x-total`。
+> 说明：项目元信息全部来自本地库 `osc_project`，不再实时透传云效；仓库链接仅作为字符串保存。
+
+### POST /projects
+
+新建项目（本地落库，不再跳转云效）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求体**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | string | 是 | 项目标题，`1 ~ 200` 字符（自动去首尾空白） |
+| `summary` | string \| null | 否 | 项目简介（Markdown 正文） |
+| `tags` | string[] | 是 | 标签列表，至少 1 个 |
+| `repo_url` | string \| null | 否 | 仓库链接（选填，可后期补充）。最长 500 字符；填写了必须是 `http(s)://` 开头且主机名含 `.` 的完整链接；留空表示未填写 |
+| `contributor_ids` | int[] \| null | 否 | 贡献者用户 id 列表（来源见 [`GET /projects/contributors`](#get-projectscontributors)），后端按用户主键去重，重复 id 只保留一条；**不存在的用户 id 会被静默忽略** |
+
+**请求示例**
+
+```json
+{ "title": "auto-recruit", "summary": "# 自动化招聘助手", "tags": ["Python"], "repo_url": "https://codeup.aliyun.com/...", "contributor_ids": [1001, 1002] }
+```
+
+**响应示例**
+
+响应 `data` 与 [`GET /projects/{project_id}`](#get-projectsproject_id) 完全一致（含 `creator_name` / `contributors` / `like_count` / `liked` / `can_edit`）：
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "user_id": 1001,
+    "title": "auto-recruit",
+    "summary": "自动化招聘助手",
+    "tags": ["Python"],
+    "repo_url": "https://codeup.aliyun.com/...",
+    "created_at": "2026-09-14 10:00:00",
+    "updated_at": "2026-09-14 10:00:00",
+    "creator_name": "张三",
+    "creator_avatar": null,
+    "contributors": [
+      { "id": 1002, "user_name": "lisi", "name": "李四", "avatar": null }
+    ],
+    "like_count": 0,
+    "liked": false,
+    "can_edit": true
+  }
+}
+```
+
+### GET /projects/contributors
+
+可选的贡献者用户列表：开源系统中已注册用户（`osc_user`），按 id 升序返回最小信息（不包含手机号 / 邮箱 / 租户），供新建 / 编辑项目时选择贡献者。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**请求参数（query）**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `keyword` | string \| null | null | 按 `user_name` 或 `name` 模糊搜索（最长 100 字符）；不传则返回最早注册的用户 |
+| `limit` | int | 20 | 返回条数上限，`1 ~ 100`（服务端强制夹紧，避免一次拉全表） |
+
+**响应示例**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    { "id": 1001, "user_name": "zhangsan", "name": "张三", "avatar": null },
+    { "id": 1002, "user_name": "lisi", "name": "李四", "avatar": "https://.../a.png" }
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | int | 用户主键 id（`osc_user.id`） |
+| `user_name` | string | 登录名 |
+| `name` | string \| null | 姓名（展示名，可能为 `null`） |
+| `avatar` | string \| null | 头像地址（可能为 `null`） |
 
 ### GET /projects/{project_id}
 
-单个仓库详情。
+单个项目详情（本地库）。
 
 | 鉴权 | 是（Bearer token） |
 | --- | --- |
@@ -891,7 +1000,7 @@ SSO 用户。
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `project_id` | int | 仓库 id（云效仓库 id） |
+| `project_id` | int | 项目 id（`osc_project.id`） |
 
 **响应示例**
 
@@ -900,26 +1009,30 @@ SSO 用户。
   "code": 200,
   "message": "success",
   "data": {
-    "id": 5940858,
-    "name": "OneTouch",
-    "nameWithNamespace": "5f278b52d248146039338d7b / ai / OneTouch",
-    "path": "FastOneTouch",
-    "httpUrlToRepo": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch.git",
-    "sshUrlToRepo": "git@codeup.aliyun.com:5f278b52d248146039338d7b/ai/FastOneTouch.git",
-    "webUrl": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch",
-    "visibility": "private",
-    "starCount": 1,
+    "id": 1,
+    "user_id": 1001,
+    "title": "OneTouch",
+    "summary": "一键触达",
+    "tags": ["Vue", "FastAPI"],
+    "repo_url": "https://codeup.aliyun.com/5f278b52d248146039338d7b/ai/FastOneTouch",
+    "created_at": "2026-09-14 10:00:00",
+    "updated_at": "2026-09-14 10:00:00",
+    "creator_name": "张三",
+    "contributors": [
+      { "id": 1002, "user_name": "lisi", "name": "李四", "avatar": null }
+    ],
     "like_count": 2,
-    "liked": true
+    "liked": true,
+    "can_edit": true
   }
 }
 ```
 
-> 说明：`data` 为云效仓库详情（`get_group_repositories_detail`）原样透传并追加 `like_count`、`liked`，字段包括 `id`、`name`、`nameWithNamespace`、`path`、`httpUrlToRepo`、`sshUrlToRepo`、`webUrl`、`visibility`、`starCount`、`defaultBranch`、`namespace`、`owner`、`permissions`、`wikiEnabled` 等。项目关联的文章/问答请用 [`GET /posts?project_id=`](#get-posts) 列表接口单独查询。
+> 项目不存在或已软删除时返回 `{ "code": 404, "message": "project not found", "data": null }`。项目关联的文章/问答请用 [`GET /posts?project_id=`](#get-posts) 列表接口单独查询；项目被软删除后其关联内容仍保留，因此该列表仍可正常返回。
 
-### POST /projects/{project_id}/like
+### PUT /projects/{project_id}
 
-点赞 / 取消赞（切换式）。
+编辑项目，仅创建者可改（非创建者、项目不存在或已软删除均返回 `404`）。字段可选，`summary` / `repo_url` 传 `null` 或空字符串表示清空。
 
 | 鉴权 | 是（Bearer token） |
 | --- | --- |
@@ -928,7 +1041,63 @@ SSO 用户。
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `project_id` | int | 项目 id（云效仓库 id） |
+| `project_id` | int | 项目 id（`osc_project.id`） |
+
+**请求体**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | string | 否 | 项目标题（`1 ~ 200` 字符）。不接受 `null`（传了会被忽略） |
+| `summary` | string \| null | 否 | 项目简介（Markdown 正文）。传 `null` 或空字符串清空，长度不限 |
+| `tags` | string[] | 否 | 标签列表（若传则至少 1 个，无法通过传空数组清空）。不接受 `null` |
+| `repo_url` | string \| null | 否 | 仓库链接。传 `null` 或空字符串清空；填写则最长 500 字符且须是 `http(s)://` 完整链接 |
+| `contributor_ids` | int[] \| null | 否 | 贡献者全量列表：传列表则整体替换（传空数组清空所有贡献者），未传该字段则不更新；不存在的用户 id 被静默忽略 |
+
+> 未出现在请求体中的字段保持原值。响应 `data` 为更新后的项目对象，**结构同 [`GET /projects/{project_id}`](#get-projectsproject_id)**。
+>
+> 若所有传入字段与当前值相同（无实际变更），后端不会写库，因此 `updated_at` 不会被刷新。
+
+### DELETE /projects/{project_id}
+
+删除项目（仅创建者）。**软删除**：只把 `osc_project.is_deleted` 置 `1`。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `project_id` | int | 项目 id（`osc_project.id`） |
+
+**行为说明**
+
+| 项 | 说明 |
+| --- | --- |
+| 项目本身 | `is_deleted` 置 `1`，此后不再出现在项目列表 / 详情 / 月报统计中 |
+| 项目下的内容 | **不删除**。关联的文章 / 问答、它们的回复与点赞、项目贡献者与项目点赞记录全部保留，可按需恢复 |
+| 权限 | 项目不存在、已删除或当前用户不是创建者，一律返回 `404`（不泄露他人项目是否存在） |
+
+**响应示例**
+
+```json
+{ "code": 200, "message": "success", "data": null }
+```
+
+> 注意：本项目删除**不会**级联删除项目下的内容，与「删除内容」`DELETE /posts/{post_id}` 的语义不同。
+
+### POST /projects/{project_id}/like
+
+点赞 / 取消赞（切换式）。项目不存在或已软删除时返回 `404`（避免写入指向不存在项目的孤儿点赞记录）。
+
+| 鉴权 | 是（Bearer token） |
+| --- | --- |
+
+**路径参数**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `project_id` | int | 项目 id（`osc_project.id`） |
 
 **行为说明（切换式）**
 
@@ -1226,7 +1395,7 @@ Authorization: Bearer <token>
 > - 「当月 / 本月」= `created_at ∈ [本月 1 日 00:00:00, 下月 1 日 00:00:00)`（本地时间）。
 > - 仅统计已发布内容（`status = "published"`），草稿 / 待审核不进入公开月报。
 > - 热门榜单取前 3（文章按 `like_count`、讨论按 `reply_count`、项目按当月点赞记录聚合）。
-> - 项目数量调云效接口取真实总数（响应头 `x-total`），项目本身不落库。
+> - 项目数量取本地库 `osc_project` 总数（项目已本地落库，不含已软删除的项目）。
 
 ### 10.1 当月统计
 
@@ -1257,7 +1426,7 @@ Authorization: Bearer <token>
 | --- | --- | --- |
 | article_count | int | 当月已发布技术文章数 |
 | qa_count | int | 当月已发布问答数 |
-| project_count | int | 项目总数（云效 `x-total`，非当月口径） |
+| project_count | int | 项目总数（本地库 `osc_project`，不含已软删除，非当月口径） |
 
 ### 10.2 热门文章
 
@@ -1352,7 +1521,7 @@ Authorization: Bearer <token>
 
 ### 10.4 热门项目
 
-> 当月点赞数前 3 的项目。按 `osc_project_like` 当月记录 `GROUP BY project_id` 聚合，仅返回 `project_id` 与点赞数，**不含项目名**（前端可用 `GET /projects/{id}` 取名称）。
+> 当月点赞数前 3 的项目。按 `osc_project_like` 当月记录 `GROUP BY project_id` 聚合，**JOIN `osc_project` 过滤掉已软删除的项目**，仅返回 `project_id` 与点赞数，**不含项目标题**（前端可用 `GET /projects/{id}` 取标题）。
 
 - **请求**
 
@@ -1377,7 +1546,7 @@ Authorization: Bearer <token>
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| project_id | int | 云效仓库 ID |
+| project_id | int | 项目 id（`osc_project.id`） |
 | like_count | int | 当月点赞数 |
 
 ### 10.5 趋势话题

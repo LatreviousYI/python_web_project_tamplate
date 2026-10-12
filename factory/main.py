@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.router import auth, common, home, notification, post, project_center, reply, report
 from apps.service.lock import cleanup_expired_locks
-from apps.tasks import start_forerver_loop, start_scheduler
+from apps.tasks import start_forerver_loop
 from common.db import get_engine
 from factory.middleware import register_error_handlers
 from factory.sync_db import sync_db
@@ -47,13 +47,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     engine = await get_engine()
     await sync_db()
     await cleanup_expired_locks()
-    scheduler = start_scheduler()
     start_forerver_loop()
 
     yield
 
     await shutdown_forever_task()
-    scheduler.shutdown()
     await httpx_utils.close_httpx()
     await engine.close()
 

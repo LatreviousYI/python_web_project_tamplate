@@ -16,7 +16,7 @@ from vorm import Session, col
 
 from apps.model.auth import User
 from apps.model.post import Post
-from apps.model.project_center import ProjectLike
+from apps.model.project_center import Project, ProjectLike
 from apps.service import project_center as project_center_service
 
 # 热门榜前 N 条
@@ -64,7 +64,7 @@ async def summary(session: Session) -> dict:
     qa_count = await (
         session.query(Post).filter(Post.type == "qa", Post.status == "published", Post.created_at >= start, Post.created_at < end).count()
     )
-    project_count = await project_center_service.count_repositories(session)
+    project_count = await project_center_service.count_projects(session)
     return {"article_count": article_count, "qa_count": qa_count, "project_count": project_count}
 
 
@@ -97,12 +97,17 @@ async def hot_discussions(session: Session, top: int = _TOP_N) -> list[dict]:
 async def hot_projects(session: Session, top: int = _TOP_N) -> list[dict]:
     """热门项目：当月点赞数前 N 的项目（按 osc_project_like 当月记录聚合）。
 
-    仅返回 project_id 与点赞数，不含项目名（项目不落库，前端用 GET /projects/{id} 取名称）。
+    只统计未软删除的项目（JOIN osc_project 过滤 is_deleted = 0），否则被删除的项目
+    仍会出现在月报里、前端取标题时拿到 404。
+    仅返回 project_id 与点赞数，不含项目名（前端用 GET /projects/{id} 取标题）。
     """
     start, end = _current_month_range()
+    like_table = ProjectLike.table_name()
+    project_table = Project.table_name()
     rows = await session.fetch_raw(
-        f"SELECT project_id, COUNT(*) AS cnt FROM {ProjectLike.table_name()} "
-        "WHERE created_at >= %s AND created_at < %s GROUP BY project_id ORDER BY cnt DESC LIMIT %s",
+        f"SELECT l.project_id, COUNT(*) AS cnt FROM {like_table} l "
+        f"JOIN {project_table} p ON p.id = l.project_id AND p.is_deleted = 0 "
+        "WHERE l.created_at >= %s AND l.created_at < %s GROUP BY l.project_id ORDER BY cnt DESC LIMIT %s",
         [start, end, top],
     )
     return [{"project_id": r["project_id"], "like_count": int(r["cnt"])} for r in rows]

@@ -46,7 +46,6 @@ report.py[DA6S]: F:技术月报业务:当月统计/热门文章/热门讨论/热
 ===D:/workspace/python/open_source_community/apps/tasks/===
 __init__.py[OW5T]: F:注册定时与常驻后台任务:APScheduler cron同步云效用户 + asyncio常驻内容审核循环 | R:code:apps/tasks/content_review.py,code:apps/tasks/yunxiao_user.py,code:utils/async_task.py | A:start_scheduler()->AsyncIOScheduler,start_forerver_loop() | S:云效用户每天0点同步;start_forerver_loop用create_task_with_safe规避弱引用回收
 content_review.py[OW6T]: F:内容审核常驻循环:持续处理pending内容,空闲休眠,分布式锁保证单实例 | R:code:apps/service/post.py,code:apps/service/lock.py,code:common/db.py,code:configs/__init__.py | A:review_pending_posts_loop() | S:每批最多50条;空闲休眠10秒;锁key=review_pending_posts;shutdown_stauts==1时退出
-yunxiao_user.py[OW5T]: F:云效用户同步定时任务入口:独立会话拉取并落库云效成员 | R:code:apps/service/project_center.py,code:apps/service/lock.py,code:common/db.py | A:sync_yunxiao_user_job() | S:锁key=sync_yunxiao_user_job;同步失败仅记日志不抛出
 
 ===D:/workspace/python/open_source_community/common/===
 db.py[RD8T]: F:数据库引擎与会话管理:惰性创建复用MySQL连接池,提供请求级与上下文会话 | R:code:configs/__init__.py,code:utils/cipher_util.py | A:get_engine(),get_session(),get_asynccontext_session() | S:db_pass经cipher解密;get_session为FastAPI依赖请求结束自动关闭;当前阶段不连库
@@ -64,7 +63,6 @@ middleware.py[MG6T]: F:全局异常处理:HTTPException/参数校验/未捕获�
 sync_db.py[PD4T]: F:应用启动对全部 ORM 模型执行 sync_table 建表(分布式锁防并发) | R:code:factory/main.py,code:common/db.py,code:apps/service/lock.py | A:sync_db(): 加锁后遍历 db_list 调 model.sync_table(session.dialect) | S:覆盖 User/Post/Reply/ReplyVote/PostLike/Notification/YunxiaoUser/ProjectLike/KeyValue/DistributedLock 十张表
 
 ===D:/workspace/python/open_source_community/utils/===
-ali_yunxiao.py[IN6S]: F:云效开放平台 API 客户端/代码组仓库与成员查询 | R:code:utils/httpx_utils.py,code:utils/log_util.py,code:utils/response_utils.py,code:apps/service/project_center.py | A:get_group_repositories(token/page/perpage) 拉仓库列表;get_group_repositories_detail(token/repositories_id) 拉详情;get_ali_yunxiao_user(token/page/perpage) 拉成员 | S:三接口读 x-yunxiao-token 头/失败记日志并抛500
 async_task.py[CW5T]: F:异步任务管理/安全创建/关闭等待/限流队列 | R:code:apps/tasks/__init__.py,code:factory/main.py,code:configs/__init__.py | A:create_task_with_safe(coro) 建任务并注册回调;shutdown_forever_task() 等待清空;TaskQueue 带上限协程队列 | S:用 settings.background_tasks 全局 set 管理任务生命周期
 betteryeah_utils.py[IA6S]: F:BetterYeah 工作流平台客户端/执行流/内容校验/结果解析 | R:code:apps/service/post.py,code:utils/cipher_util.py,code:utils/httpx_utils.py,code:utils/tools.py | A:process_json_data(data/result_type) 格式转换;execute_flow(flow_id/data) 调工作流;verfiy_content(content) 内容审核 | S:access_key 密文经 cipher.decrypt 解密后作 Access-key 头
 calculate.py[KG4T]: F:除法与环比计算工具(分母为0安全) | R:code:apps/service/report.py | A:division(numerator/denominator) 除零返回0;calculate_ring_ratio(current_num/last_period_num/zero_result) 环比 | S:上期为0本期有值时默认返回1(100%增长)
