@@ -10,6 +10,9 @@ from apps.model.base_field import BaseField
 # 可原子自增的计数字段（白名单，防止字段名注入）
 _COUNT_FIELDS = frozenset({"view_count", "reply_count", "like_count"})
 
+# API 写入上限按 Unicode 字符计数；存储需容纳 25000 个多字节字符。
+MAX_POST_CONTENT_LENGTH = 25000
+
 
 class Post(BaseField):
     """统一内容表：文章 / 问答（由 type 区分）。"""
@@ -22,7 +25,8 @@ class Post(BaseField):
     type: str = Field(max_length=16, comment="类型: article / qa")
     title: str = Field(max_length=200, comment="标题")
     summary: Optional[str] = Field(default=None, max_length=500, nullable=True, comment="摘要")
-    content: str = Field(comment="正文 markdown")
+    # TEXT 仅容纳 65535 字节，25000 个汉字/emoji 需要 MEDIUMTEXT。
+    content: str = Field(db_type="MEDIUMTEXT", comment="正文 markdown")
     status: str = Field(max_length=16, default="draft", comment="状态: draft(草稿) / pending(待审核) / published(已发布)")
     tags: list = Field(default_factory=list, comment="标签列表")
     view_count: int = Field(default=0, comment="浏览量")

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, StringConstraints
 
 from apps import dependencies
-from apps.model.post import Post
+from apps.model.post import MAX_POST_CONTENT_LENGTH, Post
 from apps.service import post as post_service
 from common.db import get_session
 from utils.response_utils import ApiResponse, PageResult
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/posts")
 
 class PostUpdate(BaseModel):
     title: str | None = None
-    content: str | None = None
+    content: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_POST_CONTENT_LENGTH)] | None = None
     summary: str | None = None
     tags: list[str] | None = None
     project_id: int | None = None
@@ -32,7 +32,7 @@ class PostStatusUpdate(BaseModel):
 
 class PostCreate(PostStatusUpdate):
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_POST_CONTENT_LENGTH)]
     type: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     summary: str | None = None
     tags: list[str] = []
@@ -43,7 +43,7 @@ class PostCreate(PostStatusUpdate):
 @router.get("")
 async def list_posts(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     type: str | None = Query(None),
     project_id: int | None = Query(None),
     session=Depends(get_session),
@@ -56,7 +56,7 @@ async def list_posts(
 @router.get("/mine")
 async def list_my_posts(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     type: str | None = Query(None),
     status: Literal["draft", "pending", "published"] | None = Query(None),
     session=Depends(get_session),
