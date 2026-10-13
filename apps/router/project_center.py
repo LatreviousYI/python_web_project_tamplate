@@ -98,7 +98,7 @@ class ProjectUpdate(BaseModel):
 @router.get("")
 async def list_projects(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     mine: bool = Query(False, description="仅返回当前用户创建的项目"),
     session=Depends(get_session),
     user_id: int = Depends(dependencies.get_current_user),
@@ -131,10 +131,10 @@ async def list_contributor_users(
     keyword: str | None = Query(None, max_length=100, description="按用户名 / 姓名模糊搜索"),
     limit: int = Query(20, ge=1, le=100, description="返回条数上限"),
     session=Depends(get_session),
-    _user_id: int = Depends(dependencies.get_current_user),
+    user_id: int = Depends(dependencies.get_current_user),
 ) -> ApiResponse:
-    """贡献者候选用户：已注册用户最小信息，服务端模糊搜索 + 限量（默认 20，最多 100）。"""
-    users = await project_center_service.list_registered_users(session, keyword, limit)
+    """贡献者候选用户：排除当前用户，服务端模糊搜索 + 限量（默认 20，最多 100）。"""
+    users = await project_center_service.list_registered_users(session, keyword, limit, exclude_user_id=user_id)
     return ApiResponse(data=users)
 
 

@@ -118,7 +118,7 @@ async def _single_project_payload(session: Session, project: Project, user_id: i
 async def list_projects(
     session: Session,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 10,
     user_id: int | None = None,
     mine: bool = False,
 ) -> dict:
@@ -131,7 +131,7 @@ async def list_projects(
         query = query.filter(Project.user_id == user_id)
     total = await query.count()
     projects = await (
-        query.order_by(col(Project.created_at).desc())
+        query.order_by(col(Project.created_at).desc(), col(Project.id).desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -147,11 +147,13 @@ async def list_registered_users(
     session: Session,
     keyword: str | None = None,
     limit: int = _CONTRIBUTOR_DEFAULT_LIMIT,
+    exclude_user_id: int | None = None,
 ) -> list[dict]:
     """贡献者候选用户（已注册用户最小信息），服务端模糊搜索 + 限量。
 
     - keyword 同时模糊匹配 user_name 与 name，不传则返回最早注册的用户；
     - limit 限制在 1 ~ 100，避免一次拉全表。
+    - exclude_user_id 在限量前排除当前用户。
     """
     try:
         limit = int(limit)
@@ -160,6 +162,8 @@ async def list_registered_users(
     limit = max(1, min(limit, _CONTRIBUTOR_MAX_LIMIT))
 
     query = session.query(User)
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
     if keyword and keyword.strip():
         pattern = f"%{keyword.strip()}%"
         query = query.filter(col(User.user_name).like(pattern) | col(User.name).like(pattern))
@@ -184,13 +188,14 @@ async def get_project_detail(session: Session, project_id: int, user_id: int | N
     return await _single_project_payload(session, project, user_id)
 
 
-async def _replace_contributors(session: Session, project_id: int, contributor_ids: list[int] | None) -> None:
+async def _replace_contributors(session: Session, project_id: int, contributor_ids: list[int] | None, creator_id: int) -> None:
     """全量替换项目贡献者（按用户主键去重），列表为空则清空。
 
-    只写入真实存在于 osc_user 的 id（静默丢弃无效 id），
+    只写入真实存在于 osc_user 的其他用户 id（静默丢弃创建者及无效 id），
     避免客户端提交任意整数产生孤儿贡献者记录。
     """
     target_ids = {int(uid) for uid in (contributor_ids or [])}
+    target_ids.discard(creator_id)
     target_ids &= await _existing_user_ids(session, target_ids)
 
     existing = await session.query(ProjectContributor).filter(ProjectContributor.project_id == project_id).all()
@@ -223,7 +228,7 @@ async def create_project(
         repo_url=repo_url or None,
     )
     await session.save(project)
-    await _replace_contributors(session, project.id, contributor_ids)
+    await _replace_contributors(session, project.id, contributor_ids, user_id)
     return await _single_project_payload(session, project, user_id)
 
 
@@ -265,7 +270,7 @@ async def update_project(session: Session, project_id: int, user_id: int, **fiel
         await session.save(project)
 
     if contributor_ids is not _UNSET:
-        await _replace_contributors(session, project.id, contributor_ids)
+        await _replace_contributors(session, project.id, contributor_ids, user_id)
 
     return await _single_project_payload(session, project, user_id)
 

@@ -45,7 +45,7 @@ async def _user_summary_map(session: Session, user_ids: set[int]) -> dict[int, d
 async def list_posts(
     session: Session,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 10,
     post_type: Optional[str] = None,
     user_id: Optional[int] = None,
     project_id: Optional[int] = None,
@@ -56,7 +56,12 @@ async def list_posts(
     if project_id is not None:
         query = query.filter(Post.project_id == project_id)
     totals = await query.count()
-    posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
+    posts = await (
+        query.order_by(col(Post.created_at).desc(), col(Post.id).desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
     user_map = await _user_summary_map(session, {p.user_id for p in posts})
     data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids, "user": user_map.get(p.user_id)} for p in posts]
@@ -67,7 +72,7 @@ async def list_my_posts(
     session: Session,
     user_id: int,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 10,
     post_type: Optional[str] = None,
     status: Optional[str] = None,
 ) -> dict:
@@ -78,7 +83,12 @@ async def list_my_posts(
     if status:
         query = query.filter(Post.status == status)
     totals = await query.count()
-    posts = await query.order_by(col(Post.created_at).desc()).offset((page - 1) * page_size).limit(page_size).all()
+    posts = await (
+        query.order_by(col(Post.created_at).desc(), col(Post.id).desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
     liked_ids = await _liked_post_ids(session, user_id, [p.id for p in posts])
     user_map = await _user_summary_map(session, {p.user_id for p in posts})
     data = [{**p.model_dump(mode="json"), "liked": p.id in liked_ids, "user": user_map.get(p.user_id)} for p in posts]
@@ -168,24 +178,26 @@ async def set_post_status(session: Session, post_id: int, user_id: int, status: 
 
 
 async def publish_post(session: Session, post_id: int) -> Post | None:
-    """系统审核通过后真正发布：pending → published。"""
-    post = await session.query(Post).filter(Post.id == post_id).first()
-    if post is None:
+    """系统审核通过后原子发布；仅 pending 可转换，未命中返回 None。"""
+    now = datetime.datetime.now()
+    affected = await session.execute_raw(
+        f"UPDATE {Post.table_name()} SET status = %s, published_at = %s, updated_at = %s WHERE id = %s AND status = %s",
+        ["published", now, now, post_id, "pending"],
+    )
+    if not affected:
         return None
-    post.status = "published"
-    post.published_at = datetime.datetime.now()
-    await session.save(post)
-    return post
+    return await session.query(Post).filter(Post.id == post_id).first()
 
 
 async def reject_post(session: Session, post_id: int) -> Post | None:
-    """系统审核不通过，打回草稿：pending → draft。"""
-    post = await session.query(Post).filter(Post.id == post_id).first()
-    if post is None:
+    """系统审核不通过后原子打回草稿；仅 pending 可转换，未命中返回 None。"""
+    affected = await session.execute_raw(
+        f"UPDATE {Post.table_name()} SET status = %s, updated_at = %s WHERE id = %s AND status = %s",
+        ["draft", datetime.datetime.now(), post_id, "pending"],
+    )
+    if not affected:
         return None
-    post.status = "draft"
-    await session.save(post)
-    return post
+    return await session.query(Post).filter(Post.id == post_id).first()
 
 
 async def review_pending_posts(session: Session, limit: int = 50) -> int:
@@ -208,11 +220,14 @@ async def review_pending_posts(session: Session, limit: int = 50) -> int:
             log_util.logger.warning("内容审核返回异常: post_id=%s, result=%s", post.id, result)
             continue
         if result["pass"] is True:
-            await publish_post(session, post.id)
+            # 多个审核任务可能读到同一 pending，只有原子状态转换成功者发送通知。
+            if await publish_post(session, post.id) is None:
+                continue
             await _notify_review(session, post, "approve", "你的内容已通过审核")
         else:
             reason = result.get("reason") or "内容不合规"
-            await reject_post(session, post.id)
+            if await reject_post(session, post.id) is None:
+                continue
             await _notify_review(session, post, "reject", reason)
             log_util.logger.info("内容审核不通过: post_id=%s, reason=%s", post.id, reason)
         reviewed += 1

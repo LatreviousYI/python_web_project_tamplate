@@ -10,7 +10,6 @@
 """
 
 import datetime
-from collections import Counter
 
 from vorm import Session, col
 
@@ -18,6 +17,7 @@ from apps.model.auth import User
 from apps.model.post import Post
 from apps.model.project_center import Project, ProjectLike
 from apps.service import project_center as project_center_service
+from apps.service.tag import count_tags
 
 # 热门榜前 N 条
 _TOP_N = 3
@@ -114,13 +114,13 @@ async def hot_projects(session: Session, top: int = _TOP_N) -> list[dict]:
 
 
 async def trending_topics(session: Session) -> list[dict]:
-    """趋势话题：当月已发布文章的标签按出现次数降序。"""
+    """趋势话题：当月已发布文章的标签按归一化后的文章数量降序。"""
     start, end = _current_month_range()
-    posts = await (
-        session.query(Post).filter(Post.type == "article", Post.status == "published", Post.created_at >= start, Post.created_at < end).all()
+    rows = await (
+        session.query(Post)
+        .filter(Post.type == "article", Post.status == "published", Post.created_at >= start, Post.created_at < end)
+        .order_by(col(Post.id).asc())
+        .select(col(Post.tags))
+        .all()
     )
-    counter: Counter = Counter()
-    for post in posts:
-        if post.tags:
-            counter.update(post.tags)
-    return [{"tag": tag, "count": count} for tag, count in counter.most_common()]
+    return count_tags(row["tags"] for row in rows)

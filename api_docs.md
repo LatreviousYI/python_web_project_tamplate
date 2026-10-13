@@ -132,7 +132,7 @@ SSO 用户。
 | `type` | string | 类型：`article` / `qa` |
 | `title` | string | 标题 |
 | `summary` | string \| null | 摘要 |
-| `content` | string | 正文（markdown） |
+| `content` | string | 正文（markdown），写入最多 25000 个 Unicode 字符（含 Markdown 标记，去除首尾空白），数据库使用 `MEDIUMTEXT` |
 | `status` | string | 状态：`draft` / `pending` / `published` |
 | `tags` | array | 标签列表 |
 | `view_count` | int | 浏览量 |
@@ -335,9 +335,11 @@ SSO 用户。
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
 | `page` | int | 1 | 页码，`>= 1` |
-| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `page_size` | int | 10 | 每页条数，`1 ~ 100`；内容页固定每页 10 条 |
 | `type` | string | — | 可选，按类型筛选：`article` / `qa` |
 | `project_id` | int | — | 可选，按项目筛选（`osc_project.id`） |
+
+同一创建时间按 `id` 倒序排列；`totals` 为筛选后的总条数，`data` 仅包含当前页记录。
 
 **响应示例**
 
@@ -384,7 +386,7 @@ SSO 用户。
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
 | `page` | int | 1 | 页码，`>= 1` |
-| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `page_size` | int | 10 | 每页条数，`1 ~ 100`；个人中心各内容状态固定每页 10 条 |
 | `type` | string | — | 可选，按类型筛选：`article` / `qa` |
 | `status` | string | — | 可选，按状态筛选：`draft` / `pending` / `published` |
 
@@ -416,7 +418,7 @@ SSO 用户。
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `title` | string | 是 | 标题，去除首尾空白后非空 |
-| `content` | string | 是 | 正文，去除首尾空白后非空 |
+| `content` | string | 是 | 正文，去除首尾空白后非空，最多 25000 个 Unicode 字符（含 Markdown 标记）；超限返回业务 `code=422` |
 | `type` | string | 是 | 类型：`article` / `qa` |
 | `status` | string | 否 | 初始状态：`draft` / `pending`，默认 `draft` |
 | `summary` | string \| null | 否 | 摘要 |
@@ -492,7 +494,7 @@ SSO 用户。
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `title` | string \| null | 标题 |
-| `content` | string \| null | 正文 |
+| `content` | string \| null | 正文，去除首尾空白后最多 25000 个 Unicode 字符（含 Markdown 标记）；超限返回业务 `code=422` |
 | `summary` | string \| null | 摘要 |
 | `tags` | array \| null | 标签列表 |
 | `project_id` | int \| null | 关联项目 id |
@@ -849,8 +851,10 @@ SSO 用户。
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
 | `page` | int | 1 | 页码，`>= 1` |
-| `page_size` | int | 20 | 每页条数，`1 ~ 100` |
+| `page_size` | int | 10 | 每页条数，`1 ~ 100`；个人中心「我的项目」固定每页 10 条 |
 | `mine` | bool | false | 为 `true` 时仅返回当前登录用户创建的项目（个人中心「我的项目」使用），`totals` 同步按该条件统计 |
+
+同一创建时间按 `id` 倒序排列；`data` 仅包含当前页记录。
 
 **响应示例**
 
@@ -957,7 +961,7 @@ SSO 用户。
 
 ### GET /projects/contributors
 
-可选的贡献者用户列表：开源系统中已注册用户（`osc_user`），按 id 升序返回最小信息（不包含手机号 / 邮箱 / 租户），供新建 / 编辑项目时选择贡献者。
+可选的贡献者用户列表：开源系统中已注册用户（`osc_user`），在限量前排除当前登录用户，按 id 升序返回最小信息（不包含手机号 / 邮箱 / 租户），供新建 / 编辑项目时选择贡献者。新建和编辑保存贡献者列表时也会忽略创建者本人。
 
 | 鉴权 | 是（Bearer token） |
 | --- | --- |
@@ -1551,7 +1555,7 @@ Authorization: Bearer <token>
 
 ### 10.5 趋势话题
 
-> 当月已发布文章的标签按出现次数降序统计（无 limit，返回全部标签）。
+> 当月已发布文章的标签按文章数量降序统计（无 limit，返回全部标签）。去掉首尾空格、合并大小写差异，同一篇文章的重复标签只计一次；数量相同时按标签名排序。
 
 - **请求**
 
@@ -1577,4 +1581,17 @@ Authorization: Bearer <token>
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | tag | string | 标签名 |
-| count | int | 当月出现次数（降序） |
+| count | int | 当月包含该标签的文章数量（降序） |
+
+### GET /tags
+
+编辑页面的标签推荐，需 Bearer token。用户可直接添加自定义标签，推荐不限制标签取值。
+
+统计全部已发布文章、问答及未删除项目的已有标签；去掉首尾空格、合并大小写差异，每条内容或项目中的重复标签只计一次。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `keyword` | string \| null | null | 最长 100 字符；不传返回热门标签，传入则不区分大小写匹配，优先精确匹配、前缀匹配，再按热度排序 |
+| `limit` | int | 20 | 返回条数上限，1 至 100 |
+
+响应 `data` 为 `[{ "tag": "Python", "count": 8 }]`，`count` 为包含该标签的内容及项目总数量。无匹配结果时为 `[]`。
