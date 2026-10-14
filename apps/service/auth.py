@@ -2,7 +2,7 @@
 鉴权业务层
 
 fastgo 单点登录：用 ticket 换取用户信息，按 accountCode 关联本地 User（不存在则创建），
-返回本地 JWT（含用户主键 id + fast_token）。
+返回本地 JWT（含用户主键 id + fast_token）、用户信息和 FastGo 菜单接口的完整响应。
 DB 会话由路由通过 common.db.get_session 注入，当前阶段不连库、不执行。
 """
 
@@ -14,7 +14,7 @@ from utils.jwt import generate_token
 
 
 async def fastgo_login(session: Session, ticket: str) -> dict:
-    """fastgo 单点登录：ticket → 用户信息 → 本地 User（find-or-create）→ 本地 JWT。"""
+    """fastgo 单点登录：ticket → 用户信息 / 菜单权限 → 本地 User → 本地 JWT。"""
     result = await fast_go.do_fastgo_check_ticket(ticket, True)
 
     if result.get("code") != 200:
@@ -27,6 +27,8 @@ async def fastgo_login(session: Session, ticket: str) -> dict:
     account_code = account_info.get("accountCode")
     if not account_code:
         response_utils.abort(401, "fastgo 未返回账号标识")
+
+    menu_tree = await fast_go.get_menu_tree_by_token(fast_token, True)
 
     # 按 accountCode 关联本地用户，不存在则创建
     user = await session.query(User).filter(User.user_id == account_code).first()
@@ -48,8 +50,7 @@ async def fastgo_login(session: Session, ticket: str) -> dict:
 
     # 本地 JWT：用户主键 id + fast_token
     token = generate_token({"user_id": user.id, "fast_token": fast_token})
-
-    return {"token": token, "user": user}
+    return {"token": token, "user": user, "menu_tree": menu_tree}
 
 
 async def fastgo_logout(fast_token: str) -> None:

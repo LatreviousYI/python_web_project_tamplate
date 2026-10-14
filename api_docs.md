@@ -242,7 +242,9 @@ SSO 用户。
 
 ### POST /auth/login
 
-用 SSO 票据（ticket）换取本地 JWT 与用户信息。
+用 SSO 票据（ticket）换取本地 JWT、用户信息，并使用返回的 `fastToken` 调用 FastGo 菜单接口。
+
+登录响应的 `data.menu_tree` 原样返回 `getMenuTreeByToken` 的完整 JSON 响应（包含上游返回的状态码、消息、数据等字段），不裁剪菜单节点。该调用的 `clientCode` 使用当前环境的 `fast_go_client` 配置。
 
 | 鉴权 | 无 |
 | --- | --- |
@@ -276,7 +278,8 @@ SSO 用户。
       "avatar": null,
       "created_at": "2026-09-14 10:00:00",
       "updated_at": "2026-09-14 10:00:00"
-    }
+    },
+    "menu_tree": {}
   }
 }
 ```

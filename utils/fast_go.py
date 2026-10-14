@@ -76,13 +76,13 @@ async def do_fastgo_check_ticket(ticket, is_backstage=True):
     return response.json()
 
 
-# async def get_menu_tree_by_token(fast_token, is_backstage=True):
-#     get_menu_url = (
-#         f"{configs.settings.fast_go_api_url}/api/fast-go/FunctionPoints/getMenuTreeByToken?clientCode={get_client_or_secret(is_backstage, True)}"
-#     )
-#     headers = {"Fast-Token": fast_token}
-#     response = await httpx_utils.httpx_client.post(get_menu_url, headers=headers)
-#     return response.json()
+async def get_menu_tree_by_token(fast_token, is_backstage=True):
+    get_menu_url = (
+        f"{configs.settings.fast_go_api_url}/api/fast-go/FunctionPoints/getMenuTreeByToken?clientCode={get_client_or_secret(is_backstage, True)}"
+    )
+    headers = {"Fast-Token": fast_token}
+    response = await httpx_utils.httpx_client.post(get_menu_url, headers=headers)
+    return response.json()
 
 
 def get_permission_children(data: list, path: str, key_word: str, children_key_word: str):
