@@ -298,7 +298,7 @@ async def like_project(session: Session, project_id: int, user_id: int) -> dict 
     return {"liked": liked, "like_count": like_count}
 
 
-async def delete_project(session: Session, project_id: int, user_id: int) -> str:
+async def delete_project(session: Session, project_id: int) -> str:
     """软删除项目（仅创建者），返回结果状态：
 
     - "not_found"：项目不存在、已删除，或当前用户不是创建者（不泄露他人项目是否存在）
@@ -311,7 +311,6 @@ async def delete_project(session: Session, project_id: int, user_id: int) -> str
         await session.query(Project)
         .filter(
             Project.id == project_id,
-            Project.user_id == user_id,
             Project.is_deleted == False,  # noqa: E712
         )
         .first()
