@@ -193,7 +193,7 @@ async def delete_project(
 
     项目下的文章 / 问答及其回复、点赞、贡献者记录全部保留，不随项目一起删除。
     """
-    result = await project_center_service.delete_project(session, project_id, user_id)
+    result = await project_center_service.delete_project(session, project_id)
     if result == "not_found":
         return ApiResponse(code=404, message="project not found")
     return ApiResponse()
