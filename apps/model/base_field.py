@@ -16,7 +16,6 @@ class BaseField(Model):
     updated_at: datetime.datetime = Field(
         default_factory=datetime.datetime.now,
         timestamp_behavior="both",  # INSERT / UPDATE 都会刷新
-        index=True,
         nullable=False,  # 模型必填，DB 侧同样禁止 NULL
     )
 
