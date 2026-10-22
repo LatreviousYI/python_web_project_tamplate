@@ -1,3 +1,8 @@
+下载项目后第一步
+```bash
+uv sync
+```
+
 
 ```bash
 导出包列表到requirements.txt
