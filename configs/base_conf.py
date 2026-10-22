@@ -14,17 +14,4 @@ class BaseSettings:
 
     jwt_algorithm = "HS256"  # 加密算法
     access_token_expire_minutes = 1440  # token 有效期 1440
-    jwt_secret_key = "91tf6f2f0bbb237143782736075b2t8d48bbacf6aafd6bee609be561d773db36"
-
-    request_password = "xiaozhi_6"  # 请求时不需要登录token验证,但是需要安全验证,可以用这个密码
-    request_password_hsah = "ab3f30418a590600ad9b6220ab5cc952fcbbb6424cfee44d7de2618b0110e717"  # AKS3HKH7KJSAJH@AS
-
-    oss_access_key_id = "o22bbXiiaMj09RStxTPUrSkcFXHMFfXzvwqJHHPDeoQ="  # LTAI5tAFmDSomsxiX78BSXtC
-    oss_access_key_secret = "rXyarn206sUswoIwOky0wlJBGCPUg5hCK2Ep2vHpcp4="
-    oss_endpoint = "https://oss-cn-shanghai.aliyuncs.com"
-    oss_bucket_name = "ai-hrbp-prod"
-
-    better_yeah_url = "https://ai-api.betteryeah.com/v1"
-
-    access_key = "/ogFPRpT+ELG8/4FnRzz6eYv0LWZud1rzBoV3wvrExSyJYk5H2u8cjFSYhHFSqRCSle77UzBJeJSoZ9d0Y/tHg=="
-    workspace_id = "6502cef03625242769fa1b56"
+    # jwt_secret_key = "91tf6f2f0bbb237143782736075b2t8d48bbacf6aafd6bee609be561d773db36"
