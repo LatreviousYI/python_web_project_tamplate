@@ -77,10 +77,45 @@ utils/          # 通用工具（日志、响应、httpx、jwt、excel、异步�
 2. 禁止在事件循环中使用阻塞调用：
    - 禁止 `requests`、`time.sleep()`、同步文件读写、同步 DB 驱动；
    - 用 `httpx.AsyncClient`（`utils/httpx_utils.py`）、`asyncio.sleep()`、`aiofiles`。
-3. 后台任务必须用 `utils/async_task.py` 的 `create_task_with_safe(coro)` 创建（自动纳入关闭时等待集合），禁止裸用 `asyncio.create_task()`。
-4. 路由处理函数一律 `async def`。
+3. **后台/持久任务必须用 `utils/async_task.py` 的 `create_task_with_safe(coro)` 创建**（自动加入 `settings.background_tasks` 托管集合，任务完成自动移除，应用关闭时统一等待收尾），禁止裸用 `asyncio.create_task()`。传入的是**协程对象**（调用 async 函数的返回值），不是函数本身：
 
-## 6. 环境管理（uv）
+   ```python
+   # 正确：传入协程对象
+   create_task_with_safe(send_email())
+   create_task_with_safe(send_email(user_id="123"))
+
+   # 错误：传入函数本身
+   create_task_with_safe(send_email)
+   ```
+
+4. 持久任务（forever loop）标准写法：`while` 循环内每轮检查 `configs.settings.background_tasks_shutdown_stauts`，为 `1` 时退出循环，保证应用关闭时 `shutdown_forever_task()` 能等待收尾：
+
+   ```python
+   async def my_forever_loop():
+       while configs.settings.background_tasks_shutdown_stauts == 0:
+           ...  # 业务逻辑
+           await asyncio.sleep(5)
+   ```
+
+5. 路由处理函数一律 `async def`。
+
+## 6. 通用工具使用规范（utils/）
+
+写新代码前先查 `utils/` 是否已有现成实现，禁止重复造轮子；新的通用函数也放 `utils/` 对应模块（按现有文件归类，不新建碎片文件）：
+
+- **日志**：统一 `log_util.logger`（nb_log，自动落盘），禁止 `print()` 调试输出、禁止自行 `import logging` 配置；
+- **HTTP 请求**：统一用 `httpx_utils.httpx_client`（全局单例，已预配置超时与连接池上限），禁止每次请求新建 `httpx.AsyncClient`、禁止 `requests`；
+- **JWT / 鉴权**：生成 token 用 `jwt.generate_token(data)`；路由鉴权用依赖 `jwt.verify_token`（返回 user_id，未登录 401）或 `jwt.verify_token_optional`（可选鉴权，未登录返回 None），禁止在业务代码中自行 decode / 校验 token；
+- **加解密**：统一 `cipher_util.cipher.encrypt()` / `decrypt()`（AES，密钥为环境变量注入的 `SEC_KEY`），禁止自行实现加解密逻辑；
+- **JSON 序列化**：统一 orjson：`tools.dict_to_json` / `dict_to_json_ea` / `json_to_dict`（自动处理 datetime / Decimal / bytes），禁止 `json.dumps` 序列化含 datetime 的数据；
+- **日期时间**：对外输出统一 `YYYY-MM-DD HH:MM:SS`（`tools.datetime_to_string()`）；解析外部时间字符串用 `tools.parse_datetime()`（多格式容错），禁止手写 `strptime` 硬编码单一格式；
+- **请求体解析**：POST JSON body 解析为 dict 用依赖 `request_utils.GetPostJsonBody`；
+- **重试**：异步重试用装饰器 `tools.async_retry_on_error(max_attempts, delay)`；
+- **入库清洗**：外部输入入库前用 `tools.sanitize_for_db()` 清洗非法控制字符；
+- **CSV 导出**：Excel 兼容的 CSV 流导出用 `excel_util.write_stream()`（utf-8-sig 带 BOM）；
+- **数值计算**：分母可能为 0 的除法用 `calculate.division()`（返回 0 不抛错），环比计算用 `calculate.calculate_ring_ratio()`。
+
+## 7. 环境管理（uv）
 
 1. 本地开发统一使用 uv 管理 Python 环境：
    - 安装依赖：`uv sync`；
@@ -89,7 +124,7 @@ utils/          # 通用工具（日志、响应、httpx、jwt、excel、异步�
 2. 禁止直接 `pip install`（会绕过 lock，导致环境不可复现）。
 3. `pyproject.toml` 和 `uv.lock` 必须保持同步提交。
 
-## 7. 部署形态与分布式锁（重要）
+## 8. 部署形态与分布式锁（重要）
 
 1. 生产环境使用 gunicorn + `uvicorn.workers.UvicornWorker` 启动**多个 worker**（数量 = CPU 核数，见 `gunicorn.conf.py`；dev/uat 为 2 个）。因此：
    - **进程内存不共享**：模块级变量、内存缓存、单例状态在每个 worker 中各有一份，禁止当作全局共享存储使用；
@@ -98,12 +133,12 @@ utils/          # 通用工具（日志、响应、httpx、jwt、excel、异步�
 3. 涉及互斥的资源（任务调度、缓存重建、唯一性写入等）必须使用分布式锁方案（如数据库锁表 / 唯一索引抢占、Redis 锁等），禁止依赖进程内锁（`threading.Lock` 等对多 worker 无效）。
 4. vorm 提供 `for_update()` / `for_update(skip_locked=True)` 行级悲观锁，仅可在事务内使用；跨 worker 的调度互斥优先用"锁表 + 唯一索引抢占"模式。
 
-## 8. 代码风格
+## 9. 代码风格
 
 - ruff 检查（`pyproject.toml` 已配置）：行宽 150、4 空格缩进、双引号；
 - 新增代码必须通过 ruff 检查，不留 `F401`（未使用导入）、`F821`（未定义名称）等错误。
 
-## 9. 禁止事项速查
+## 10. 禁止事项速查
 
 - 禁止引入 vorm 之外的 ORM 或数据库访问方式（原生 SQL 仅在必要时用 vorm 的 `execute_raw()` / `fetch_raw()`）；
 - 禁止外键、多对多 ORM 关系；
@@ -111,5 +146,7 @@ utils/          # 通用工具（日志、响应、httpx、jwt、excel、异步�
 - 禁止同步阻塞调用；
 - 禁止直接 pip 安装依赖；
 - 禁止在业务代码中直接读取环境变量（`os.getenv` / `os.environ`）或硬编码配置，配置一律走 `configs.settings`；
+- 禁止 `print()` 调试输出，日志统一 `log_util.logger`；
+- 禁止重复造轮子：写工具函数前先查 `utils/` 是否已有实现；
 - 禁止绕过 `BaseField` 自行定义主键为非自增 int（单库场景）；
 - 禁止假设单 worker 运行而省略分布式锁。
