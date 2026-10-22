@@ -6,11 +6,8 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from common.db import get_engine
+from factory import bootstrap
 from factory.middleware import register_error_handlers
-# from factory.sync_db import sync_db
-from utils import httpx_utils
-from utils.async_task import shutdown_forever_task
 
 
 def register_routers(app: FastAPI):
@@ -36,16 +33,9 @@ def create_app() -> FastAPI:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    engine = await get_engine()
-    # await sync_db()
-    # await cleanup_expired_locks()
-    # start_forerver_loop()
-
+    await bootstrap.startup()
     yield
-
-    await shutdown_forever_task()
-    await httpx_utils.close_httpx()
-    await engine.close()
+    await bootstrap.shutdown()
 
 
 app = create_app()
