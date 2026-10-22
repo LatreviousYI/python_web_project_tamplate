@@ -3,7 +3,7 @@ from pathlib import Path
 
 class BaseSettings:
     sec_key = ""
-    app_name = "open_source_community"
+    app_name = "sme"
     # 为了解决create_task方法弱引用问题
     background_tasks = set()
     # 0表示开启,1表示关闭,在程序关闭时会更改为 1
@@ -14,4 +14,4 @@ class BaseSettings:
 
     jwt_algorithm = "HS256"  # 加密算法
     access_token_expire_minutes = 1440  # token 有效期 1440
-    # jwt_secret_key = "91tf6f2f0bbb237143782736075b2t8d48bbacf6aafd6bee609be561d773db36"
+    jwt_secret_key = "91tf6f2f0bbb237143782736075b2t8d48bbacf6aafd6bee609be561d773db36"
