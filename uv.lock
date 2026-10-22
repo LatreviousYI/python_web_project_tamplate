@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1188,43 +1188,6 @@ wheels = [
 ]
 
 [[package]]
-name = "open-source-community"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "apscheduler" },
-    { name = "fastapi", extra = ["standard"] },
-    { name = "gunicorn" },
-    { name = "httpx" },
-    { name = "nb-log" },
-    { name = "openpyxl" },
-    { name = "orjson" },
-    { name = "oss2" },
-    { name = "pycryptodome" },
-    { name = "pyjwt" },
-    { name = "python-dotenv" },
-    { name = "vorm" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=24.1.0" },
-    { name = "apscheduler", extras = ["asyncio"], specifier = ">=3.11.3" },
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
-    { name = "gunicorn", specifier = ">=26.2.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "nb-log", specifier = ">=14.4" },
-    { name = "openpyxl", specifier = ">=3.1.0" },
-    { name = "orjson", specifier = ">=3.9.0" },
-    { name = "oss2", specifier = ">=2.18.0" },
-    { name = "pycryptodome", specifier = ">=3.23.0" },
-    { name = "pyjwt", specifier = ">=2.8.0" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "vorm", specifier = "==0.1.6" },
-]
-
-[[package]]
 name = "openpyxl"
 version = "3.1.5"
 source = { registry = "https://mirrors.huaweicloud.com/repository/pypi/simple" }
@@ -1922,6 +1885,43 @@ wheels = [
 ]
 
 [[package]]
+name = "sme-workbench-server"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "apscheduler" },
+    { name = "fastapi", extra = ["standard"] },
+    { name = "gunicorn" },
+    { name = "httpx" },
+    { name = "nb-log" },
+    { name = "openpyxl" },
+    { name = "orjson" },
+    { name = "oss2" },
+    { name = "pycryptodome" },
+    { name = "pyjwt" },
+    { name = "python-dotenv" },
+    { name = "vorm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=24.1.0" },
+    { name = "apscheduler", extras = ["asyncio"], specifier = ">=3.11.3" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
+    { name = "gunicorn", specifier = ">=26.2.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "nb-log", specifier = ">=14.4" },
+    { name = "openpyxl", specifier = ">=3.1.0" },
+    { name = "orjson", specifier = ">=3.9.0" },
+    { name = "oss2", specifier = ">=2.18.0" },
+    { name = "pycryptodome", specifier = ">=3.23.0" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "vorm", specifier = "==0.1.9" },
+]
+
+[[package]]
 name = "starlette"
 version = "1.6.0"
 source = { registry = "https://mirrors.huaweicloud.com/repository/pypi/simple" }
@@ -2131,7 +2131,7 @@ wheels = [
 
 [[package]]
 name = "vorm"
-version = "0.1.6"
+version = "0.1.9"
 source = { registry = "https://mirrors.huaweicloud.com/repository/pypi/simple" }
 dependencies = [
     { name = "asyncmy" },
@@ -2139,9 +2139,9 @@ dependencies = [
     { name = "cryptography" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/05/26/ce2819bb19acf0cedd2502614595f1e907ce58a225f49a1fa8b715724a14/vorm-0.1.6.tar.gz", hash = "sha256:f838ba799086317c9ba91828cc30dccb59ba0ad4a9aa98663b412876d8f0ab01" }
+sdist = { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/0b/68/0d08c1ab9d9abc0716f671eed576aaccc44059028b1a799273301e211c71/vorm-0.1.9.tar.gz", hash = "sha256:1aeff3b9681323f3680b73cdd3c48a09e0b89f378b706236329ec193fef98754" }
 wheels = [
-    { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/4a/08/7b320bf3065d6da34256bb236d89aff6e813d784cfd7fd7b026d44f93cde/vorm-0.1.6-py3-none-any.whl", hash = "sha256:596f76e5a8727d5015d8dbd54d1ad809b94a76abb51eec84fea51814b6e06c71" },
+    { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/44/09/1b292a0bfbd9acfc05c90a6a49842985e0dc59c070b570b7d4d1d2fa4d2d/vorm-0.1.9-py3-none-any.whl", hash = "sha256:766e1ba4101b153d5e84b1634972ad286c9b38da5b3f44b2a4f855955439775d" },
 ]
 
 [[package]]
