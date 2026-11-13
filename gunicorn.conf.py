@@ -1,11 +1,11 @@
-import os
 import multiprocessing
 
-app_env = os.getenv("APP_ENV")  # None
+from configs import settings
+
 daemon = False  # 是否以守护进程的方式启动
-bind = "0.0.0.0:8779"
+bind = f"{settings.server_host}:{settings.server_port}"
 pidfile = "gunicorn.pid"
-workers = multiprocessing.cpu_count() if app_env not in ("dev", "uat") else 2
+workers = multiprocessing.cpu_count() if settings.env not in ("dev", "uat") else 2
 # workers = multiprocessing.cpu_count() * 2 + 1
 # workers = 1
 accesslog = "./logs/gunicorn_access.log"

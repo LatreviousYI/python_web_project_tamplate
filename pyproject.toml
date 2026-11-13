@@ -1,14 +1,14 @@
 [project]
 name = "sme-workbench-server"
 version = "0.1.0"
-description = "Add your description here"
+description = "FastAPI and vorm based Python web project template"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi[standard]>=0.141.1",
     "nb-log>=14.4",
     "pycryptodome>=3.23.0",
-    "vorm==0.1.9",
+    "vorm==0.1.12",
     "python-dotenv>=1.0.1",
     "pyjwt>=2.8.0",
     "oss2>=2.18.0",
@@ -31,7 +31,7 @@ extraPaths = ["."]
 typeCheckingMode = "basic"
 
 [tool.ruff]
-# Set the maximum line length to 79.
+# Set the maximum line length to 150.
 line-length = 150
 indent-width = 4
 

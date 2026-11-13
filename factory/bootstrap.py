@@ -84,9 +84,10 @@ async def startup() -> None:
 
 async def shutdown() -> None:
     """应用关闭：停调度器 → 等待后台任务 → 关闭 httpx → 关闭连接池。"""
+    global scheduler
     if scheduler is not None:
         scheduler.shutdown(wait=False)
+        scheduler = None
     await shutdown_forever_task()
     await httpx_utils.close_httpx()
-    if db.mysql_engine is not None:
-        await db.mysql_engine.close()
+    await db.close_engine()

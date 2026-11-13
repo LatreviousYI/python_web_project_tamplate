@@ -37,14 +37,25 @@ def create_task_with_safe(coro):
     coro_task.add_done_callback(configs.settings.background_tasks.discard)
 
 
-async def shutdown_forever_task():
+async def shutdown_forever_task(timeout: float = 10.0):
+    """通知后台任务退出，等待超时后取消剩余任务。"""
     configs.settings.background_tasks_shutdown_stauts = 1
-    while True:
-        if not configs.settings.background_tasks:
+    tasks = configs.settings.background_tasks
+    if not tasks:
+        return
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while tasks:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            pending_tasks = list(tasks)
+            log_util.logger.warning(f"后台任务关闭超时，取消剩余 {len(pending_tasks)} 个任务")
+            for task in pending_tasks:
+                task.cancel()
+            await asyncio.gather(*pending_tasks, return_exceptions=True)
             return
-        else:
-            await asyncio.sleep(1)
-            log_util.logger.info(f"还有{len(configs.settings.background_tasks)}个任务未关闭")
+        await asyncio.sleep(min(0.2, remaining))
 
 
 class TaskQueue:

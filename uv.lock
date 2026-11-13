@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1918,7 +1918,7 @@ requires-dist = [
     { name = "pycryptodome", specifier = ">=3.23.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "vorm", specifier = "==0.1.9" },
+    { name = "vorm", specifier = "==0.1.12" },
 ]
 
 [[package]]
@@ -2131,17 +2131,18 @@ wheels = [
 
 [[package]]
 name = "vorm"
-version = "0.1.9"
+version = "0.1.12"
 source = { registry = "https://mirrors.huaweicloud.com/repository/pypi/simple" }
 dependencies = [
     { name = "asyncmy" },
     { name = "asyncpg" },
     { name = "cryptography" },
+    { name = "orjson" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/0b/68/0d08c1ab9d9abc0716f671eed576aaccc44059028b1a799273301e211c71/vorm-0.1.9.tar.gz", hash = "sha256:1aeff3b9681323f3680b73cdd3c48a09e0b89f378b706236329ec193fef98754" }
+sdist = { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/fa/c7/54fab3bbd2cf85661193435df6e7a351f334db3bcc7824e4fc3105e3c33c/vorm-0.1.12.tar.gz", hash = "sha256:28b335320de69cef93047422b954ed877d53ffb24e858604087c774857c78e6e" }
 wheels = [
-    { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/44/09/1b292a0bfbd9acfc05c90a6a49842985e0dc59c070b570b7d4d1d2fa4d2d/vorm-0.1.9-py3-none-any.whl", hash = "sha256:766e1ba4101b153d5e84b1634972ad286c9b38da5b3f44b2a4f855955439775d" },
+    { url = "https://mirrors.huaweicloud.com/repository/pypi/packages/ba/ba/221d43fdd45c7fe93bd39a64614811c2815f068eacb294681d34ac4d4b09/vorm-0.1.12-py3-none-any.whl", hash = "sha256:63f25feda1aff353fc293a9c8a49697485a7a76fc7b20ca311d990c865ecdb2d" },
 ]
 
 [[package]]

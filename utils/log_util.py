@@ -10,7 +10,7 @@ import sys
 from configs import settings
 
 # 创建日志目录
-log_dir = settings.basedir.joinpath(f"logs")
+log_dir = settings.basedir / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # 将项目路径插入到sys.path[1]的位置,这样nb_log就能读取当前项目下的nb_log_config.py文件
@@ -22,7 +22,7 @@ from nb_log import get_logger
 get_logger(name="uvicorn.access", log_filename="uvicorn_access.log")
 
 # 主应用日志记录器
-logger = get_logger(name="osc", log_filename="osc.log")
+logger = get_logger(name=settings.app_name, log_filename=f"{settings.app_name}.log")
 
 # 开发环境下降低第三方库的日志级别，避免日志噪音
 if settings.env == "dev":

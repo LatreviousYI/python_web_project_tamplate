@@ -1,19 +1,38 @@
 """
 加解密工具模块
 
-提供AES对称加密解密功能，使用CBC模式和PKCS7填充
+新密文使用 AES-GCM，nonce 和认证标签随密文一起保存。
 """
 
-from base64 import b64encode, b64decode
+import secrets
+from base64 import b64decode, b64encode
 
 from Crypto.Cipher import AES  # pip install pycryptodome
-from Crypto.Util.Padding import pad, unpad
+from Crypto.Hash import SHA256
+from Crypto.Protocol.KDF import HKDF
 
-from configs import settings
+GCM_NONCE_LENGTH = 12
+GCM_TAG_LENGTH = 16
+
+
+def generate_sec_key() -> str:
+    """生成 32 字节的十六进制 AES 密钥（64 个字符）。"""
+    return secrets.token_hex(32)
+
+
+def derive_key(master_key_hex: str, purpose: str, length: int = 32) -> bytes:
+    """从 SEC_KEY 派生指定用途的子密钥。"""
+    if not purpose:
+        raise ValueError("密钥用途不能为空")
+    master_key = bytes.fromhex(master_key_hex)
+    derived_key = HKDF(master_key, length, b"", SHA256, context=purpose.encode("utf-8"))
+    if not isinstance(derived_key, bytes):
+        raise RuntimeError("派生密钥格式错误")
+    return derived_key
 
 
 class AESCipher:
-    """AES加密解密类，支持128/192/256位密钥"""
+    """AES 加密解密类，支持 128/192/256 位密钥。"""
 
     def __init__(self, key):
         """
@@ -27,51 +46,71 @@ class AESCipher:
             raise ValueError("sec_key长度错误，应为16/24/32字节")
         self.key = key_bytes
 
-    def encrypt(self, data):
+    def encrypt(self, data: str) -> str:
         """
-        加密数据
+        使用 AES-GCM 加密数据。
 
         Args:
             data: 待加密的字符串
 
         Returns:
-            Base64编码的密文
+            包含 nonce、密文和 tag 的 Base64 字符串
         """
-        cipher = AES.new(self.key, AES.MODE_ECB)
-        ct_bytes = cipher.encrypt(pad(data.encode(), AES.block_size))
-        return b64encode(ct_bytes).decode("utf-8")
+        nonce = secrets.token_bytes(GCM_NONCE_LENGTH)
+        cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce, mac_len=GCM_TAG_LENGTH)
+        ciphertext, tag = cipher.encrypt_and_digest(data.encode("utf-8"))
+        payload = nonce + ciphertext + tag
+        return b64encode(payload).decode("ascii")
 
-    def decrypt(self, data):
+    def decrypt(self, data: str) -> str:
         """
-        解密数据
+        使用 AES-GCM 解密数据。
 
         Args:
-            data: Base64编码的密文
+            data: 包含 nonce、密文和 tag 的 Base64 字符串
 
         Returns:
             解密后的明文字符串
         """
-        ct = b64decode(data)
-        cipher = AES.new(self.key, AES.MODE_ECB)
-        return unpad(cipher.decrypt(ct), AES.block_size).decode("utf-8")
+        try:
+            payload = b64decode(data, validate=True)
+        except ValueError as exc:
+            raise ValueError("密文格式错误") from exc
+
+        if len(payload) < GCM_NONCE_LENGTH + GCM_TAG_LENGTH:
+            raise ValueError("密文格式错误")
+
+        nonce = payload[:GCM_NONCE_LENGTH]
+        ciphertext = payload[GCM_NONCE_LENGTH:-GCM_TAG_LENGTH]
+        tag = payload[-GCM_TAG_LENGTH:]
+        cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce, mac_len=GCM_TAG_LENGTH)
+
+        try:
+            plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+            return plaintext.decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise ValueError("密文校验失败或密钥错误") from exc
 
 
-# 全局加密器实例
-sec_key = settings.sec_key
-cipher = AESCipher(sec_key)
+class _LazyCipher:
+    """延迟读取 SEC_KEY，使密钥生成函数不依赖现有配置。"""
+
+    def __init__(self):
+        self._cipher: AESCipher | None = None
+
+    def _get_cipher(self) -> AESCipher:
+        if self._cipher is None:
+            from configs import settings
+
+            self._cipher = AESCipher(settings.sec_key)
+        return self._cipher
+
+    def encrypt(self, data: str) -> str:
+        return self._get_cipher().encrypt(data)
+
+    def decrypt(self, data: str) -> str:
+        return self._get_cipher().decrypt(data)
 
 
-if __name__ == "__main__":
-    import secrets
-
-    # 生成新的十六进制密钥（32字节=256位）
-    key_hex = secrets.token_hex(16)
-    print(f"生成密钥: {key_hex}")
-
-    # 测试加密解密
-    passwd = "dinghfa4ngnuwyd8h3fq"
-    encrypted = cipher.encrypt(passwd)
-    print(f"加密: {encrypted}")
-
-    decrypted = cipher.decrypt(encrypted)
-    print(f"解密: {decrypted}")
+# 保留原有调用方式：cipher.encrypt() / cipher.decrypt()
+cipher = _LazyCipher()

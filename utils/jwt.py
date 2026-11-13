@@ -5,7 +5,8 @@ JWT 工具模块
 当前为 SSO-ready 占位：假定 SSO 已发放 JWT，token 中携带 user_id。
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Optional
 
 import jwt
@@ -16,7 +17,14 @@ from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 from configs import settings
 from utils import response_utils
+from utils.cipher_util import derive_key
 from utils.log_util import logger
+
+
+@lru_cache(maxsize=1)
+def _get_jwt_secret_key() -> bytes:
+    """从 SEC_KEY 派生独立的 JWT 签名密钥。"""
+    return derive_key(settings.sec_key, "jwt-signing")
 
 
 class HTTPBearerRaise401(HTTPBearer):
@@ -46,15 +54,15 @@ def generate_token(data: dict, expiration_delta: Optional[timedelta] = None):
     token_data = data.copy()
     if not expiration_delta:
         expiration_delta = timedelta(minutes=settings.access_token_expire_minutes)
-    expiration_time = datetime.now() + expiration_delta
+    expiration_time = datetime.now(timezone.utc) + expiration_delta
     token_data.update({"exp": expiration_time.timestamp()})
-    encoded_token = jwt.encode(token_data, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    encoded_token = jwt.encode(token_data, _get_jwt_secret_key(), algorithm=settings.jwt_algorithm)
     return encoded_token
 
 
 def get_uid_from_jwt(token: str):
     """从 JWT 解出 user_id。"""
-    decoded_payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    decoded_payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[settings.jwt_algorithm])
     return decoded_payload.get("user_id")
 
 
@@ -64,9 +72,9 @@ def decode_token_get_info(
     """解析并校验 token，返回其 payload。"""
     token = credentials.credentials
     try:
-        decoded_payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        decoded_payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[settings.jwt_algorithm])
     except (ExpiredSignatureError, InvalidTokenError) as e:
-        logger.exception(f"token verification error. {e}")
+        logger.warning(f"token verification error. {e}")
         response_utils.invalid_token()
     except Exception as e:
         logger.exception(f"token verification error. {e}")
@@ -78,7 +86,10 @@ def decode_token_get_info(
 
 def verify_token(token_info: dict = Depends(decode_token_get_info)) -> int | None:
     """鉴权依赖：返回当前用户主键 id（int）。"""
-    return token_info.get("user_id")
+    user_id = token_info.get("user_id")
+    if not isinstance(user_id, int):
+        response_utils.invalid_token()
+    return user_id
 
 
 def decode_token_get_info_optional(
@@ -89,7 +100,7 @@ def decode_token_get_info_optional(
         return None
     token = credentials.credentials
     try:
-        return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, _get_jwt_secret_key(), algorithms=[settings.jwt_algorithm])
     except (ExpiredSignatureError, InvalidTokenError):
         return None
 
@@ -98,4 +109,5 @@ def verify_token_optional(token_info: Optional[dict] = Depends(decode_token_get_
     """可选鉴权依赖：已登录返回用户主键 id（int），未登录 / 非法 token 返回 None。"""
     if token_info is None:
         return None
-    return token_info.get("user_id")
+    user_id = token_info.get("user_id")
+    return user_id if isinstance(user_id, int) else None
